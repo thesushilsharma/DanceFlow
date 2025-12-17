@@ -85,7 +85,7 @@ export function AppSidebar() {
             <Calendar className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Dance Studio</h2>
+            <h2 className="text-lg font-semibold">Dance Flow Studio</h2>
             <p className="text-xs text-muted-foreground">Admin Portal</p>
           </div>
         </div>
