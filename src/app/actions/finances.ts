@@ -14,7 +14,7 @@ export async function getPayments() {
         dueDate: payments.dueDate,
         paidDate: payments.paidDate,
         status: payments.status,
-        method: payments.paymentMethod,
+        method: payments.method,
         notes: payments.notes,
         studentId: payments.studentId,
         studentFirstName: students.firstName,
