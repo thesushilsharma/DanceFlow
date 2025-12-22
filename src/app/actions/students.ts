@@ -21,7 +21,7 @@ export async function getStudents(searchQuery?: string) {
     }
     return await db.select().from(students)
   } catch (error) {
-    console.error("[v0] Error fetching students:", error)
+    console.error("Error fetching students:", error)
     throw new Error("Failed to fetch students")
   }
 }
@@ -58,7 +58,7 @@ export async function createStudent(formData: FormData) {
     revalidatePath("/dashboard/students")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error creating student:", error)
+    console.error("Error creating student:", error)
     return { success: false, error: "Failed to create student" }
   }
 }
@@ -69,7 +69,7 @@ export async function deleteStudent(id: string) {
     revalidatePath("/dashboard/students")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error deleting student:", error)
+    console.error("Error deleting student:", error)
     return { success: false, error: "Failed to delete student" }
   }
 }

@@ -25,7 +25,7 @@ export async function getPayments() {
 
     return paymentsWithStudents
   } catch (error) {
-    console.error("[v0] Error fetching payments:", error)
+    console.error("Error fetching payments:", error)
     throw new Error("Failed to fetch payments")
   }
 }
@@ -34,7 +34,7 @@ export async function getExpenses() {
   try {
     return await db.select().from(expenses)
   } catch (error) {
-    console.error("[v0] Error fetching expenses:", error)
+    console.error("Error fetching expenses:", error)
     throw new Error("Failed to fetch expenses")
   }
 }
@@ -76,7 +76,7 @@ export async function getFinancialSummary() {
       outstanding,
     }
   } catch (error) {
-    console.error("[v0] Error fetching financial summary:", error)
+    console.error("Error fetching financial summary:", error)
     return {
       totalRevenue: 0,
       totalExpenses: 0,
@@ -109,7 +109,7 @@ export async function createPayment(formData: FormData) {
     revalidatePath("/dashboard/finances")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error creating payment:", error)
+    console.error("Error creating payment:", error)
     return { success: false, error: "Failed to create payment" }
   }
 }
@@ -137,7 +137,7 @@ export async function createExpense(formData: FormData) {
     revalidatePath("/dashboard/finances")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error creating expense:", error)
+    console.error("Error creating expense:", error)
     return { success: false, error: "Failed to create expense" }
   }
 }

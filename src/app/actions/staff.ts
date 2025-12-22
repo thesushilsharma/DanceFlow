@@ -9,7 +9,7 @@ export async function getStaff() {
   try {
     return await db.select().from(staff)
   } catch (error) {
-    console.error("[v0] Error fetching staff:", error)
+    console.error("Error fetching staff:", error)
     throw new Error("Failed to fetch staff")
   }
 }
@@ -41,7 +41,7 @@ export async function createStaff(formData: FormData) {
     revalidatePath("/dashboard/staff")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error creating staff:", error)
+    console.error("Error creating staff:", error)
     return { success: false, error: "Failed to create staff member" }
   }
 }
@@ -52,7 +52,7 @@ export async function deleteStaff(id: string) {
     revalidatePath("/dashboard/staff")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error deleting staff:", error)
+    console.error("Error deleting staff:", error)
     return { success: false, error: "Failed to delete staff member" }
   }
 }

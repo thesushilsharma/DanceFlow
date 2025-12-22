@@ -32,7 +32,7 @@ export async function getClasses() {
 
     return classesWithDetails
   } catch (error) {
-    console.error("[v0] Error fetching classes:", error)
+    console.error("Error fetching classes:", error)
     throw new Error("Failed to fetch classes")
   }
 }
@@ -70,7 +70,7 @@ export async function createClass(formData: FormData) {
     revalidatePath("/dashboard/classes")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error creating class:", error)
+    console.error("Error creating class:", error)
     return { success: false, error: "Failed to create class" }
   }
 }
@@ -81,7 +81,7 @@ export async function deleteClass(id: string) {
     revalidatePath("/dashboard/classes")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error deleting class:", error)
+    console.error("Error deleting class:", error)
     return { success: false, error: "Failed to delete class" }
   }
 }

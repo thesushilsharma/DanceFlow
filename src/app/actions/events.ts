@@ -1,0 +1,58 @@
+"use server"
+
+import { db } from "@/drizzle/db"
+import { events } from "@/drizzle/migrations/schema"
+import { revalidatePath } from "next/cache"
+import { eq, desc } from "drizzle-orm"
+
+export async function getEvents() {
+  try {
+    const allEvents = await db.select().from(events).orderBy(desc(events.date))
+    return { success: true, data: allEvents }
+  } catch (error) {
+    console.error("Failed to fetch events:", error)
+    return { success: false, error: "Failed to fetch events" }
+  }
+}
+
+export async function createEvent(formData: FormData) {
+  try {
+    const name = formData.get("name") as string
+    const type = formData.get("type") as "recital" | "competition" | "workshop" | "showcase" | "other"
+    const date = formData.get("date") as string
+    const startTime = formData.get("startTime") as string
+    const endTime = formData.get("endTime") as string
+    const location = formData.get("location") as string
+    const description = formData.get("description") as string
+    const capacity = formData.get("capacity") ? Number.parseInt(formData.get("capacity") as string) : null
+
+    await db.insert(events).values({
+      name,
+      type,
+      date,
+      startTime,
+      endTime,
+      location,
+      description,
+      capacity,
+      status: "upcoming",
+    })
+
+    revalidatePath("/dashboard/events")
+    return { success: true, message: "Event created successfully" }
+  } catch (error) {
+    console.error("Failed to create event:", error)
+    return { success: false, error: "Failed to create event" }
+  }
+}
+
+export async function deleteEvent(eventId: string) {
+  try {
+    await db.delete(events).where(eq(events.id, eventId))
+    revalidatePath("/dashboard/events")
+    return { success: true, message: "Event deleted successfully" }
+  } catch (error) {
+    console.error("Failed to delete event:", error)
+    return { success: false, error: "Failed to delete event" }
+  }
+}
