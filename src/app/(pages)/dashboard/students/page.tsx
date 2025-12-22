@@ -1,9 +1,12 @@
+import { getStudents } from "@/app/actions/students"
 
+export default async function StudentsPage() {
+  const students = await getStudents()
+  console.log(students)
 
-export default function StudentsPage() {
   return (
     <div className="p-6 space-y-6">
-    Dance Flow Students
+      Dance Flow Students
     </div>
   )
 }
