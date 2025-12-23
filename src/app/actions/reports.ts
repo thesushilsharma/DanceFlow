@@ -10,29 +10,30 @@ export async function getFinancialStats() {
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
 
     const revenue = await db
-      .select({ total: sql<number>`sum(${payments.amount})` })
+      .select({ total: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)` })
       .from(payments)
       .where(and(gte(payments.paidDate, firstDayOfMonth), eq(payments.status, "paid")))
 
     const expensesTotal = await db
-      .select({ total: sql<number>`sum(${expenses.amount})` })
+      .select({ total: sql<string>`COALESCE(sum(CAST(${expenses.amount} AS DECIMAL)), 0)` })
       .from(expenses)
       .where(gte(expenses.date, firstDayOfMonth))
 
-    const totalRevenue = revenue[0]?.total || 0
-    const totalExpenses = expensesTotal[0]?.total || 0
+    const totalRevenue = Number.parseFloat(revenue[0]?.total || "0")
+    const totalExpenses = Number.parseFloat(expensesTotal[0]?.total || "0")
 
     return {
-      success: true,
-      data: {
-        totalRevenue,
-        totalExpenses,
-        netProfit: totalRevenue - totalExpenses,
-      },
+      totalRevenue,
+      totalExpenses,
+      netProfit: totalRevenue - totalExpenses,
     }
   } catch (error) {
-    console.error("Failed to fetch financial stats:", error)
-    return { success: false, error: "Failed to fetch financial stats" }
+    console.error("[v0] Failed to fetch financial stats:", error)
+    return {
+      totalRevenue: 0,
+      totalExpenses: 0,
+      netProfit: 0,
+    }
   }
 }
 
@@ -50,10 +51,10 @@ export async function getClassPerformance() {
       .where(eq(classes.status, "active"))
       .groupBy(classes.id, classes.name, classes.capacity)
 
-    return { success: true, data: classPerformance }
+    return classPerformance
   } catch (error) {
-    console.error("Failed to fetch class performance:", error)
-    return { success: false, error: "Failed to fetch class performance" }
+    console.error("[v0] Failed to fetch class performance:", error)
+    return []
   }
 }
 
@@ -82,16 +83,17 @@ export async function getAttendanceStats() {
     const late = lateCount[0]?.count || 0
 
     return {
-      success: true,
-      data: {
-        overallRate: total > 0 ? Math.round((present / total) * 100) : 0,
-        lateRate: total > 0 ? Math.round((late / total) * 100) : 0,
-        totalRecords: total,
-      },
+      overallRate: total > 0 ? Math.round((present / total) * 100) : 0,
+      lateRate: total > 0 ? Math.round((late / total) * 100) : 0,
+      totalRecords: total,
     }
   } catch (error) {
-    console.error("Failed to fetch attendance stats:", error)
-    return { success: false, error: "Failed to fetch attendance stats" }
+    console.error("[v0] Failed to fetch attendance stats:", error)
+    return {
+      overallRate: 0,
+      lateRate: 0,
+      totalRecords: 0,
+    }
   }
 }
 
@@ -102,17 +104,20 @@ export async function getMonthlyRevenueData() {
 
     const revenueData = await db
       .select({
-        month: sql<string>`to_char(${payments.paidDate}, 'Mon')`,
-        revenue: sql<number>`sum(${payments.amount})`,
+        month: sql<string>`to_char(${payments.paidDate}::date, 'Mon')`,
+        revenue: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)`,
       })
       .from(payments)
       .where(and(gte(payments.paidDate, sixMonthsAgo), eq(payments.status, "paid")))
-      .groupBy(sql`to_char(${payments.paidDate}, 'Mon')`)
+      .groupBy(sql`to_char(${payments.paidDate}::date, 'Mon')`)
 
-    return { success: true, data: revenueData }
+    return revenueData.map((item) => ({
+      month: item.month,
+      revenue: Number.parseFloat(item.revenue || "0"),
+    }))
   } catch (error) {
-    console.error("Failed to fetch monthly revenue data:", error)
-    return { success: false, error: "Failed to fetch monthly revenue data" }
+    console.error("[v0] Failed to fetch monthly revenue data:", error)
+    return []
   }
 }
 
@@ -123,16 +128,16 @@ export async function getEnrollmentTrends() {
 
     const enrollmentData = await db
       .select({
-        month: sql<string>`to_char(${enrollments.enrollmentDate}, 'Mon')`,
+        month: sql<string>`to_char(${enrollments.enrollmentDate}::date, 'Mon')`,
         enrollments: sql<number>`count(*)`,
       })
       .from(enrollments)
       .where(gte(enrollments.enrollmentDate, sixMonthsAgo))
-      .groupBy(sql`to_char(${enrollments.enrollmentDate}, 'Mon')`)
+      .groupBy(sql`to_char(${enrollments.enrollmentDate}::date, 'Mon')`)
 
-    return { success: true, data: enrollmentData }
+    return enrollmentData
   } catch (error) {
-    console.error("Failed to fetch enrollment trends:", error)
-    return { success: false, error: "Failed to fetch enrollment trends" }
+    console.error("[v0] Failed to fetch enrollment trends:", error)
+    return []
   }
 }

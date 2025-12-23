@@ -8,10 +8,10 @@ import { eq, desc } from "drizzle-orm"
 export async function getDocuments() {
   try {
     const allDocuments = await db.select().from(documents).orderBy(desc(documents.uploadedAt))
-    return { success: true, data: allDocuments }
+    return allDocuments
   } catch (error) {
     console.error("Failed to fetch documents:", error)
-    return { success: false, error: "Failed to fetch documents" }
+    return []
   }
 }
 

@@ -20,7 +20,7 @@ export async function getDashboardStats() {
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
 
     const revenue = await db
-      .select({ total: sql<number>`sum(${payments.amount})` })
+      .select({ total: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)` })
       .from(payments)
       .where(and(gte(payments.paidDate, firstDayOfMonth), eq(payments.status, "paid")))
 
@@ -39,17 +39,19 @@ export async function getDashboardStats() {
       totalAttendance[0]?.count > 0 ? Math.round(((presentCount[0]?.count || 0) / totalAttendance[0].count) * 100) : 0
 
     return {
-      success: true,
-      data: {
-        totalStudents: studentCount[0]?.count || 0,
-        activeClasses: classCount[0]?.count || 0,
-        monthlyRevenue: revenue[0]?.total || 0,
-        attendanceRate,
-      },
+      totalStudents: studentCount[0]?.count || 0,
+      activeClasses: classCount[0]?.count || 0,
+      monthlyRevenue: Number.parseFloat(revenue[0]?.total || "0"),
+      attendanceRate,
     }
   } catch (error) {
-    console.error("Failed to fetch dashboard stats:", error)
-    return { success: false, error: "Failed to fetch dashboard stats" }
+    console.error("[v0] Failed to fetch dashboard stats:", error)
+    return {
+      totalStudents: 0,
+      activeClasses: 0,
+      monthlyRevenue: 0,
+      attendanceRate: 0,
+    }
   }
 }
 
@@ -67,10 +69,10 @@ export async function getRecentEnrollments() {
       .orderBy(desc(enrollments.enrollmentDate))
       .limit(5)
 
-    return { success: true, data: recentEnrollments }
+    return recentEnrollments
   } catch (error) {
-    console.error("Failed to fetch recent enrollments:", error)
-    return { success: false, error: "Failed to fetch recent enrollments" }
+    console.error("[v0] Failed to fetch recent enrollments:", error)
+    return []
   }
 }
 
@@ -80,9 +82,9 @@ export async function getUpcomingEvents() {
 
     const upcomingEvents = await db.select().from(events).where(gte(events.date, today)).orderBy(events.date).limit(5)
 
-    return { success: true, data: upcomingEvents }
+    return upcomingEvents
   } catch (error) {
-    console.error("Failed to fetch upcoming events:", error)
-    return { success: false, error: "Failed to fetch upcoming events" }
+    console.error("[v0] Failed to fetch upcoming events:", error)
+    return []
   }
 }

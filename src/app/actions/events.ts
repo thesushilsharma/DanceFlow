@@ -8,10 +8,10 @@ import { eq, desc } from "drizzle-orm"
 export async function getEvents() {
   try {
     const allEvents = await db.select().from(events).orderBy(desc(events.date))
-    return { success: true, data: allEvents }
+    return allEvents
   } catch (error) {
     console.error("Failed to fetch events:", error)
-    return { success: false, error: "Failed to fetch events" }
+    return []
   }
 }
 
