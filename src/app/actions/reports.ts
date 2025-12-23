@@ -28,7 +28,7 @@ export async function getFinancialStats() {
       netProfit: totalRevenue - totalExpenses,
     }
   } catch (error) {
-    console.error("[v0] Failed to fetch financial stats:", error)
+    console.error("Failed to fetch financial stats:", error)
     return {
       totalRevenue: 0,
       totalExpenses: 0,
@@ -53,7 +53,7 @@ export async function getClassPerformance() {
 
     return classPerformance
   } catch (error) {
-    console.error("[v0] Failed to fetch class performance:", error)
+    console.error("Failed to fetch class performance:", error)
     return []
   }
 }
@@ -88,7 +88,7 @@ export async function getAttendanceStats() {
       totalRecords: total,
     }
   } catch (error) {
-    console.error("[v0] Failed to fetch attendance stats:", error)
+    console.error("Failed to fetch attendance stats:", error)
     return {
       overallRate: 0,
       lateRate: 0,
@@ -116,7 +116,7 @@ export async function getMonthlyRevenueData() {
       revenue: Number.parseFloat(item.revenue || "0"),
     }))
   } catch (error) {
-    console.error("[v0] Failed to fetch monthly revenue data:", error)
+    console.error("Failed to fetch monthly revenue data:", error)
     return []
   }
 }
@@ -137,7 +137,7 @@ export async function getEnrollmentTrends() {
 
     return enrollmentData
   } catch (error) {
-    console.error("[v0] Failed to fetch enrollment trends:", error)
+    console.error("Failed to fetch enrollment trends:", error)
     return []
   }
 }

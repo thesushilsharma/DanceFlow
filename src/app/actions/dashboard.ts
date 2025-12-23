@@ -45,7 +45,7 @@ export async function getDashboardStats() {
       attendanceRate,
     }
   } catch (error) {
-    console.error("[v0] Failed to fetch dashboard stats:", error)
+    console.error("Failed to fetch dashboard stats:", error)
     return {
       totalStudents: 0,
       activeClasses: 0,
@@ -71,7 +71,7 @@ export async function getRecentEnrollments() {
 
     return recentEnrollments
   } catch (error) {
-    console.error("[v0] Failed to fetch recent enrollments:", error)
+    console.error("Failed to fetch recent enrollments:", error)
     return []
   }
 }
@@ -84,7 +84,7 @@ export async function getUpcomingEvents() {
 
     return upcomingEvents
   } catch (error) {
-    console.error("[v0] Failed to fetch upcoming events:", error)
+    console.error("Failed to fetch upcoming events:", error)
     return []
   }
 }

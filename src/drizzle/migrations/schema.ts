@@ -118,6 +118,7 @@ export const events = pgTable("events", {
   startTime: text("start_time"),
   endTime: text("end_time"),
   location: text("location"),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
   status: eventStatusEnum("status").default("upcoming").notNull(),
   capacity: integer("capacity"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

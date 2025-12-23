@@ -25,6 +25,7 @@ export async function createEvent(formData: FormData) {
     const location = formData.get("location") as string
     const description = formData.get("description") as string
     const capacity = formData.get("capacity") ? Number.parseInt(formData.get("capacity") as string) : null
+    const cost = formData.get("cost") as string | null
 
     await db.insert(events).values({
       name,
@@ -35,6 +36,7 @@ export async function createEvent(formData: FormData) {
       location,
       description,
       capacity,
+      cost,
       status: "upcoming",
     })
 
