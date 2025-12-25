@@ -7,7 +7,7 @@ import { eq, desc } from "drizzle-orm"
 
 export async function getEvents() {
   try {
-    const allEvents = await db.select().from(events).orderBy(desc(events.date))
+    const allEvents = await db.select().from(events).orderBy(desc(events.eventDate))
     return allEvents
   } catch (error) {
     console.error("Failed to fetch events:", error)
@@ -18,24 +18,22 @@ export async function getEvents() {
 export async function createEvent(formData: FormData) {
   try {
     const name = formData.get("name") as string
-    const type = formData.get("type") as "recital" | "competition" | "workshop" | "showcase" | "other"
-    const date = formData.get("date") as string
+    const eventType = formData.get("type") as "recital" | "competition" | "workshop" | "showcase" | "other"
+    const eventDate = formData.get("date") as string
     const startTime = formData.get("startTime") as string
     const endTime = formData.get("endTime") as string
     const location = formData.get("location") as string
     const description = formData.get("description") as string
-    const capacity = formData.get("capacity") ? Number.parseInt(formData.get("capacity") as string) : null
     const cost = formData.get("cost") as string | null
 
     await db.insert(events).values({
       name,
-      type,
-      date,
+      eventType,
+      eventDate,
       startTime,
       endTime,
       location,
       description,
-      capacity,
       cost,
       status: "upcoming",
     })

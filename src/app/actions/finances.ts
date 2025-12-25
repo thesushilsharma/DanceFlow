@@ -12,9 +12,11 @@ export async function getPayments() {
         id: payments.id,
         amount: payments.amount,
         dueDate: payments.dueDate,
-        paidDate: payments.paidDate,
+        paymentDate: payments.paymentDate,
         status: payments.status,
-        method: payments.method,
+        paymentMethod: payments.paymentMethod,
+        paymentType: payments.paymentType,
+        referenceNumber: payments.referenceNumber,
         notes: payments.notes,
         studentId: payments.studentId,
         studentFirstName: students.firstName,
@@ -48,14 +50,14 @@ export async function getFinancialSummary() {
         total: sql<string>`cast(sum(${payments.amount}) as text)`,
       })
       .from(payments)
-      .where(gte(payments.paidDate, currentMonth))
+      .where(gte(payments.paymentDate, currentMonth))
 
     const [expensesResult] = await db
       .select({
         total: sql<string>`cast(sum(${expenses.amount}) as text)`,
       })
       .from(expenses)
-      .where(gte(expenses.date, currentMonth))
+      .where(gte(expenses.expenseDate, currentMonth))
 
     const [outstandingResult] = await db
       .select({
@@ -90,20 +92,24 @@ export async function createPayment(formData: FormData) {
   try {
     const studentId = formData.get("studentId") as string
     const amount = formData.get("amount") as string
-    const dueDate = formData.get("dueDate") as string
-    const paidDate = formData.get("paidDate") as string
-    const method = formData.get("method") as string
-    const status = (formData.get("status") as any) || "paid"
-    const notes = formData.get("notes") as string
+    const dueDate = formData.get("dueDate") as string | null
+    const paymentDate = formData.get("paymentDate") as string
+    const paymentMethod = formData.get("paymentMethod") as string | null
+    const paymentType = formData.get("paymentType") as string | null
+    const referenceNumber = formData.get("referenceNumber") as string | null
+    const status = (formData.get("status") as any) || "completed"
+    const notes = formData.get("notes") as string | null
 
     await db.insert(payments).values({
       studentId,
       amount,
-      dueDate,
-      paidDate: paidDate || null,
-      method,
+      dueDate: dueDate || undefined,
+      paymentDate,
+      paymentMethod: paymentMethod || undefined,
+      paymentType: paymentType || undefined,
+      referenceNumber: referenceNumber || undefined,
       status,
-      notes,
+      notes: notes || undefined,
     })
 
     revalidatePath("/dashboard/finances")
@@ -128,7 +134,7 @@ export async function createExpense(formData: FormData) {
       category,
       description,
       amount,
-      date,
+      expenseDate: date,
       vendor,
       paymentMethod,
       notes,
@@ -141,3 +147,4 @@ export async function createExpense(formData: FormData) {
     return { success: false, error: "Failed to create expense" }
   }
 }
+

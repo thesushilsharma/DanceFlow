@@ -22,18 +22,18 @@ export async function getDashboardStats() {
     const revenue = await db
       .select({ total: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)` })
       .from(payments)
-      .where(and(gte(payments.paidDate, firstDayOfMonth), eq(payments.status, "paid")))
+      .where(and(gte(payments.paymentDate, firstDayOfMonth), eq(payments.status, "paid")))
 
     // Get attendance rate for current month
     const totalAttendance = await db
       .select({ count: sql<number>`count(*)` })
       .from(attendance)
-      .where(gte(attendance.date, firstDayOfMonth))
+      .where(gte(attendance.attendanceDate, firstDayOfMonth))
 
     const presentCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(attendance)
-      .where(and(gte(attendance.date, firstDayOfMonth), eq(attendance.status, "present")))
+      .where(and(gte(attendance.attendanceDate, firstDayOfMonth), eq(attendance.status, "present")))
 
     const attendanceRate =
       totalAttendance[0]?.count > 0 ? Math.round(((presentCount[0]?.count || 0) / totalAttendance[0].count) * 100) : 0
@@ -80,7 +80,12 @@ export async function getUpcomingEvents() {
   try {
     const today = new Date().toISOString().split("T")[0]
 
-    const upcomingEvents = await db.select().from(events).where(gte(events.date, today)).orderBy(events.date).limit(5)
+    const upcomingEvents = await db
+      .select()
+      .from(events)
+      .where(gte(events.eventDate, today))
+      .orderBy(events.eventDate)
+      .limit(5)
 
     return upcomingEvents
   } catch (error) {

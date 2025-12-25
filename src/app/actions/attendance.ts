@@ -23,7 +23,7 @@ export async function getAttendanceForClass(classId: string, date: string) {
     const attendanceRecords = await db
       .select()
       .from(attendance)
-      .where(and(eq(attendance.classId, classId), eq(attendance.date, date)))
+      .where(and(eq(attendance.classId, classId), eq(attendance.attendanceDate, date)))
 
     // Combine the data
     const attendanceData = enrolled.map((student) => {
@@ -59,7 +59,7 @@ export async function updateAttendance(
       await db.insert(attendance).values({
         classId,
         studentId,
-        date,
+        attendanceDate: date,
         status,
       })
     }

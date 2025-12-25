@@ -12,12 +12,12 @@ export async function getFinancialStats() {
     const revenue = await db
       .select({ total: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)` })
       .from(payments)
-      .where(and(gte(payments.paidDate, firstDayOfMonth), eq(payments.status, "paid")))
+      .where(and(gte(payments.paymentDate, firstDayOfMonth), eq(payments.status, "paid")))
 
     const expensesTotal = await db
       .select({ total: sql<string>`COALESCE(sum(CAST(${expenses.amount} AS DECIMAL)), 0)` })
       .from(expenses)
-      .where(gte(expenses.date, firstDayOfMonth))
+      .where(gte(expenses.expenseDate, firstDayOfMonth))
 
     const totalRevenue = Number.parseFloat(revenue[0]?.total || "0")
     const totalExpenses = Number.parseFloat(expensesTotal[0]?.total || "0")
@@ -43,13 +43,13 @@ export async function getClassPerformance() {
       .select({
         className: classes.name,
         classId: classes.id,
-        capacity: classes.capacity,
+        capacity: classes.maxCapacity,
         enrolled: sql<number>`count(distinct ${enrollments.studentId})`,
       })
       .from(classes)
       .leftJoin(enrollments, eq(enrollments.classId, classes.id))
       .where(eq(classes.status, "active"))
-      .groupBy(classes.id, classes.name, classes.capacity)
+      .groupBy(classes.id, classes.name, classes.maxCapacity)
 
     return classPerformance
   } catch (error) {
@@ -66,17 +66,17 @@ export async function getAttendanceStats() {
     const totalAttendance = await db
       .select({ count: sql<number>`count(*)` })
       .from(attendance)
-      .where(gte(attendance.date, firstDayOfMonth))
+      .where(gte(attendance.attendanceDate, firstDayOfMonth))
 
     const presentCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(attendance)
-      .where(and(gte(attendance.date, firstDayOfMonth), eq(attendance.status, "present")))
+      .where(and(gte(attendance.attendanceDate, firstDayOfMonth), eq(attendance.status, "present")))
 
     const lateCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(attendance)
-      .where(and(gte(attendance.date, firstDayOfMonth), eq(attendance.status, "late")))
+      .where(and(gte(attendance.attendanceDate, firstDayOfMonth), eq(attendance.status, "late")))
 
     const total = totalAttendance[0]?.count || 0
     const present = presentCount[0]?.count || 0
@@ -104,12 +104,12 @@ export async function getMonthlyRevenueData() {
 
     const revenueData = await db
       .select({
-        month: sql<string>`to_char(${payments.paidDate}::date, 'Mon')`,
+        month: sql<string>`to_char(${payments.paymentDate}::date, 'Mon')`,
         revenue: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)`,
       })
       .from(payments)
-      .where(and(gte(payments.paidDate, sixMonthsAgo), eq(payments.status, "paid")))
-      .groupBy(sql`to_char(${payments.paidDate}::date, 'Mon')`)
+      .where(and(gte(payments.paymentDate, sixMonthsAgo), eq(payments.status, "paid")))
+      .groupBy(sql`to_char(${payments.paymentDate}::date, 'Mon')`)
 
     return revenueData.map((item) => ({
       month: item.month,
