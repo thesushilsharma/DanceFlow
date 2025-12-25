@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/drizzle/db"
-import { classes, payments, expenses, attendance, enrollments } from "@/drizzle/migrations/schema"
+import { classes, payments, expenses, attendance, enrollments } from "@/drizzle/schema"
 import { sql, gte, eq, and } from "drizzle-orm"
 
 export async function getFinancialStats() {

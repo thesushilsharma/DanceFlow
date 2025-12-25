@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/drizzle/db"
-import { events } from "@/drizzle/migrations/schema"
+import { events } from "@/drizzle/schema"
 import { revalidatePath } from "next/cache"
 import { eq, desc } from "drizzle-orm"
 

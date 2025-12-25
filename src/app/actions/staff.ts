@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { staff } from  "@/drizzle/migrations/schema"
+import { staff } from  "@/drizzle/schema"
 import { eq } from "drizzle-orm"
 
 export async function getStaff() {

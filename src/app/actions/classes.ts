@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { classes, enrollments, staff } from "@/drizzle/migrations/schema"
+import { classes, enrollments, staff } from "@/drizzle/schema"
 import { eq, sql } from "drizzle-orm"
 
 export async function getClasses() {

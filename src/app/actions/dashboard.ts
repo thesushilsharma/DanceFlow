@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/drizzle/db"
-import { students, classes, payments, attendance, enrollments, events } from "@/drizzle/migrations/schema"
+import { students, classes, payments, attendance, enrollments, events } from "@/drizzle/schema"
 import { eq, gte, sql, desc, and } from "drizzle-orm"
 
 export async function getDashboardStats() {

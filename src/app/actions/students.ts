@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { students } from "@/drizzle/migrations/schema"
+import { students } from "@/drizzle/schema"
 import { eq, ilike, or } from "drizzle-orm"
 
 export async function getStudents(searchQuery?: string) {

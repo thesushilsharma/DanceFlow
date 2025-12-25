@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { payments, expenses, students } from "@/drizzle/migrations/schema"
+import { payments, expenses, students } from "@/drizzle/schema"
 import { eq, sql, gte } from "drizzle-orm"
 
 export async function getPayments() {
