@@ -4,6 +4,7 @@ import { db } from "@/drizzle/db"
 import { attendance, enrollments, students } from "@/drizzle/schema"
 import { revalidatePath } from "next/cache"
 import { eq, and } from "drizzle-orm"
+export type AttendanceStatus = "present" | "absent" | "late" | "excused"
 
 export async function getAttendanceForClass(classId: string, date: string) {
   try {
@@ -47,7 +48,7 @@ export async function updateAttendance(
   classId: string,
   studentId: string,
   date: string,
-  status: "present" | "absent" | "late" | "excused",
+  status: AttendanceStatus,
   attendanceId?: string,
 ) {
   try {
