@@ -11,14 +11,14 @@ export async function getClasses() {
       .select({
         id: classes.id,
         name: classes.name,
-        type: classes.type,
+        type: classes.classType,
         level: classes.level,
         dayOfWeek: classes.dayOfWeek,
         startTime: classes.startTime,
         endTime: classes.endTime,
         room: classes.room,
-        capacity: classes.capacity,
-        tuition: classes.tuition,
+        capacity: classes.maxCapacity,
+        tuition: classes.tuitionFee,
         status: classes.status,
         instructorId: classes.instructorId,
         instructorFirstName: staff.firstName,
@@ -33,7 +33,7 @@ export async function getClasses() {
     return classesWithDetails
   } catch (error) {
     console.error("Error fetching classes:", error)
-    throw new Error("Failed to fetch classes")
+    return []
   }
 }
 
@@ -54,15 +54,15 @@ export async function createClass(formData: FormData) {
 
     await db.insert(classes).values({
       name,
-      type,
+      classType: type,
       level,
       instructorId: instructorId || null,
       dayOfWeek,
       startTime,
       endTime,
       room,
-      capacity,
-      tuition,
+      maxCapacity: capacity,
+      tuitionFee: tuition,
       status,
       startDate,
     })
@@ -85,3 +85,4 @@ export async function deleteClass(id: string) {
     return { success: false, error: "Failed to delete class" }
   }
 }
+

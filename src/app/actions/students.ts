@@ -22,7 +22,7 @@ export async function getStudents(searchQuery?: string) {
     return await db.select().from(students)
   } catch (error) {
     console.error("Error fetching students:", error)
-    throw new Error("Failed to fetch students")
+    return []
   }
 }
 
@@ -47,11 +47,11 @@ export async function createStudent(formData: FormData) {
       email,
       phone,
       address,
-      emergencyContact,
-      emergencyPhone,
+      emergencyContactName: emergencyContact,
+      emergencyContactPhone: emergencyPhone,
       level,
       status,
-      medicalNotes,
+      medicalConditions: medicalNotes,
       enrollmentDate: new Date().toISOString().split("T")[0],
     })
 

@@ -28,7 +28,7 @@ export async function getPayments() {
     return paymentsWithStudents
   } catch (error) {
     console.error("Error fetching payments:", error)
-    throw new Error("Failed to fetch payments")
+    return []
   }
 }
 
@@ -37,7 +37,7 @@ export async function getExpenses() {
     return await db.select().from(expenses)
   } catch (error) {
     console.error("Error fetching expenses:", error)
-    throw new Error("Failed to fetch expenses")
+    return []
   }
 }
 

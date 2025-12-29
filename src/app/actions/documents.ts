@@ -26,13 +26,14 @@ export async function uploadDocument(formData: FormData) {
     const notes = formData.get("notes") as string
 
     await db.insert(documents).values({
-      name,
-      type,
+      title: name,
+      documentType: type,
+      fileName: name, // Using name as fileName for now
       studentId,
       uploadedBy,
       fileSize,
       fileUrl,
-      notes,
+      description: notes,
     })
 
     revalidatePath("/dashboard/documents")
