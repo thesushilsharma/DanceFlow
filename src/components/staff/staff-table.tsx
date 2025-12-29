@@ -1,8 +1,15 @@
-"use client"
+"use client";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,45 +17,45 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Edit, Trash } from "lucide-react"
-import { deleteStaff } from "@/app/actions/staff"
-import { useOptimistic, useTransition } from "react"
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Eye, Edit, Trash } from "lucide-react";
+import { deleteStaff } from "@/app/actions/staff";
+import { useOptimistic, useTransition } from "react";
 
 type Staff = {
-  id: number
-  name: string
-  email: string
-  phone: string
-  role: string
-  specializations: string[]
-  hireDate: string
-  status: string
-}
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  specializations: string[];
+  hireDate: string;
+  status: string;
+};
 
 const roleColors = {
   Owner: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
   Instructor: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   Admin: "bg-green-500/10 text-green-700 dark:text-green-400",
   Assistant: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
-}
+};
 
 const statusColors = {
   active: "bg-green-500/10 text-green-700 dark:text-green-400",
   inactive: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   "on-leave": "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
-}
+};
 
 export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
-  const [isPending, startTransition] = useTransition()
-  const [optimisticStaff, setOptimisticStaff] = useOptimistic(initialStaff)
+  const [isPending, startTransition] = useTransition();
+  const [optimisticStaff, setOptimisticStaff] = useOptimistic(initialStaff);
 
-  const handleDelete = (staffId: number) => {
+  const handleDelete = (staffId: string) => {
     startTransition(async () => {
-      setOptimisticStaff(optimisticStaff.filter((s) => s.id !== staffId))
-      await deleteStaff(staffId)
-    })
-  }
+      setOptimisticStaff(optimisticStaff.filter((s) => s.id !== staffId));
+      await deleteStaff(staffId);
+    });
+  };
 
   return (
     <div className="border rounded-lg">
@@ -69,7 +76,10 @@ export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
             <TableRow key={staff.id} className={isPending ? "opacity-50" : ""}>
               <TableCell className="font-medium">{staff.name}</TableCell>
               <TableCell>
-                <Badge variant="secondary" className={roleColors[staff.role as keyof typeof roleColors]}>
+                <Badge
+                  variant="secondary"
+                  className={roleColors[staff.role as keyof typeof roleColors]}
+                >
                   {staff.role}
                 </Badge>
               </TableCell>
@@ -94,7 +104,12 @@ export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
               </TableCell>
               <TableCell>{staff.hireDate}</TableCell>
               <TableCell>
-                <Badge variant="secondary" className={statusColors[staff.status as keyof typeof statusColors]}>
+                <Badge
+                  variant="secondary"
+                  className={
+                    statusColors[staff.status as keyof typeof statusColors]
+                  }
+                >
                   {staff.status}
                 </Badge>
               </TableCell>
@@ -117,7 +132,10 @@ export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(staff.id)}>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => handleDelete(staff.id)}
+                    >
                       <Trash className="h-4 w-4 mr-2" />
                       Delete
                     </DropdownMenuItem>
@@ -129,5 +147,5 @@ export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
         </TableBody>
       </Table>
     </div>
-  )
+  );
 }

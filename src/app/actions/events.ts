@@ -8,7 +8,19 @@ import { eq, desc } from "drizzle-orm"
 export async function getEvents() {
   try {
     const allEvents = await db.select().from(events).orderBy(desc(events.eventDate))
-    return allEvents
+    return allEvents.map((event) => ({
+      id: event.id,
+      name: event.name,
+      type: event.eventType as "recital" | "competition" | "workshop" | "showcase" | "other",
+      description: event.description,
+      date: typeof event.eventDate === "string" ? event.eventDate : event.eventDate.toISOString().split("T")[0],
+      startTime: event.startTime,
+      endTime: event.endTime,
+      location: event.location,
+      cost: event.cost,
+      status: event.status,
+      capacity: null,
+    }))
   } catch (error) {
     console.error("Failed to fetch events:", error)
     return []

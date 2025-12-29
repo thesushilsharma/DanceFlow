@@ -25,7 +25,17 @@ export async function getPayments() {
       .from(payments)
       .leftJoin(students, eq(payments.studentId, students.id))
 
-    return paymentsWithStudents
+    return paymentsWithStudents.map((payment) => ({
+      id: payment.id,
+      studentFirstName: payment.studentFirstName,
+      studentLastName: payment.studentLastName,
+      amount: payment.amount,
+      paidDate: payment.paymentDate ? String(payment.paymentDate) : null,
+      dueDate: payment.dueDate ? String(payment.dueDate) : "",
+      method: payment.paymentMethod,
+      status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
+      notes: payment.notes,
+    }))
   } catch (error) {
     console.error("Error fetching payments:", error)
     return []
@@ -34,7 +44,17 @@ export async function getPayments() {
 
 export async function getExpenses() {
   try {
-    return await db.select().from(expenses)
+    const allExpenses = await db.select().from(expenses)
+    return allExpenses.map((expense) => ({
+      id: expense.id,
+      category: expense.category,
+      description: expense.description,
+      amount: expense.amount,
+      date: String(expense.expenseDate),
+      vendor: expense.vendor,
+      paymentMethod: expense.paymentMethod,
+      notes: expense.notes,
+    }))
   } catch (error) {
     console.error("Error fetching expenses:", error)
     return []
@@ -97,7 +117,7 @@ export async function createPayment(formData: FormData) {
     const paymentMethod = formData.get("paymentMethod") as string | null
     const paymentType = formData.get("paymentType") as string | null
     const referenceNumber = formData.get("referenceNumber") as string | null
-    const status = (formData.get("status") as any) || "completed"
+    const status = (formData.get("status") as string) || "completed"
     const notes = formData.get("notes") as string | null
 
     await db.insert(payments).values({

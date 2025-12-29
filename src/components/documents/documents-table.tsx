@@ -18,8 +18,9 @@ import { useOptimistic, useTransition } from "react"
 
 interface Document {
   id: string
-  name: string
-  type: "contract" | "waiver" | "medical" | "certificate" | "other"
+  title: string
+  documentType: "contract" | "waiver" | "medical" | "certificate" | "other"
+  fileName: string
   fileUrl: string
   fileSize: number | null
   uploadedBy: string | null
@@ -76,12 +77,15 @@ export function DocumentsTable({ initialDocuments }: { initialDocuments: Documen
               <TableCell>
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{doc.name}</span>
+                  <span className="font-medium">{doc.title}</span>
                 </div>
               </TableCell>
               <TableCell>
-                <Badge variant="secondary" className={typeColors[getTypeLabel(doc.type) as keyof typeof typeColors]}>
-                  {getTypeLabel(doc.type)}
+                <Badge
+                  variant="secondary"
+                  className={typeColors[getTypeLabel(doc.documentType) as keyof typeof typeColors]}
+                >
+                  {getTypeLabel(doc.documentType)}
                 </Badge>
               </TableCell>
               <TableCell>{doc.studentId || "General"}</TableCell>

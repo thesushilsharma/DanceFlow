@@ -8,7 +8,17 @@ import { eq, desc } from "drizzle-orm"
 export async function getDocuments() {
   try {
     const allDocuments = await db.select().from(documents).orderBy(desc(documents.uploadedAt))
-    return allDocuments
+    return allDocuments.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      documentType: doc.documentType as "contract" | "waiver" | "medical" | "certificate" | "other",
+      fileName: doc.fileName,
+      fileUrl: doc.fileUrl,
+      fileSize: doc.fileSize,
+      uploadedBy: doc.uploadedBy,
+      uploadedAt: doc.uploadedAt,
+      studentId: doc.studentId,
+    }))
   } catch (error) {
     console.error("Failed to fetch documents:", error)
     return []

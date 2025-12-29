@@ -87,7 +87,12 @@ export async function getUpcomingEvents() {
       .orderBy(events.eventDate)
       .limit(5)
 
-    return upcomingEvents
+    return upcomingEvents.map((event) => ({
+      id: event.id,
+      name: event.name,
+      type: event.eventType,
+      date: String(event.eventDate),
+    }))
   } catch (error) {
     console.error("Failed to fetch upcoming events:", error)
     return []
