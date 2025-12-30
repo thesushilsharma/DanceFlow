@@ -48,7 +48,7 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
                   : "Unknown Student"}
               </TableCell>
               <TableCell>${Number.parseFloat(payment.amount).toFixed(2)}</TableCell>
-              <TableCell>{payment.dueDate}</TableCell>
+              <TableCell>{payment.dueDate || "N/A"}</TableCell>
               <TableCell>{payment.paidDate || "-"}</TableCell>
               <TableCell>{payment.method || "-"}</TableCell>
               <TableCell>

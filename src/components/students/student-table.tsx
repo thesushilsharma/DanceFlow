@@ -21,9 +21,9 @@ type Student = {
   firstName: string
   lastName: string
   dateOfBirth: string
-  email: string
-  phone: string
-  level: string
+  email: string | null
+  phone: string | null
+  level: string | null
   status: string
   enrollmentDate: string
 }
@@ -90,7 +90,7 @@ export function StudentTable({ students }: { students: Student[] }) {
                   {student.firstName} {student.lastName}
                 </TableCell>
                 <TableCell>{calculateAge(student.dateOfBirth)}</TableCell>
-                <TableCell>{student.level}</TableCell>
+                <TableCell>{student.level || "N/A"}</TableCell>
                 <TableCell>{student.enrollmentDate}</TableCell>
                 <TableCell>
                   <Badge variant="secondary" className={statusColors[student.status as keyof typeof statusColors]}>
@@ -99,8 +99,8 @@ export function StudentTable({ students }: { students: Student[] }) {
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
-                    <div>{student.phone}</div>
-                    <div className="text-muted-foreground">{student.email}</div>
+                    <div>{student.phone || "N/A"}</div>
+                    <div className="text-muted-foreground">{student.email || "N/A"}</div>
                   </div>
                 </TableCell>
                 <TableCell>
