@@ -13,7 +13,7 @@ export async function getEvents() {
       name: event.name,
       type: event.eventType as "recital" | "competition" | "workshop" | "showcase" | "other",
       description: event.description,
-      date: typeof event.eventDate === "string" ? event.eventDate : event.eventDate.toISOString().split("T")[0],
+      date: String(event.eventDate),
       startTime: event.startTime,
       endTime: event.endTime,
       location: event.location,

@@ -7,19 +7,28 @@ import { eq, ilike, or } from "drizzle-orm"
 
 export async function getStudents(searchQuery?: string) {
   try {
-    if (searchQuery) {
-      return await db
-        .select()
-        .from(students)
-        .where(
+    const query = db.select().from(students)
+    const allStudents = searchQuery
+      ? await query.where(
           or(
             ilike(students.firstName, `%${searchQuery}%`),
             ilike(students.lastName, `%${searchQuery}%`),
             ilike(students.email, `%${searchQuery}%`),
           ),
         )
-    }
-    return await db.select().from(students)
+      : await query
+    
+    return allStudents.map((student) => ({
+      id: student.id,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      dateOfBirth: String(student.dateOfBirth),
+      email: student.email,
+      phone: student.phone,
+      level: student.level,
+      status: student.status,
+      enrollmentDate: String(student.enrollmentDate),
+    }))
   } catch (error) {
     console.error("Error fetching students:", error)
     return []
@@ -37,7 +46,7 @@ export async function createStudent(formData: FormData) {
     const emergencyContact = formData.get("emergencyContact") as string
     const emergencyPhone = formData.get("emergencyPhone") as string
     const level = formData.get("level") as string
-    const status = (formData.get("status") as any) || "active"
+    const status = (formData.get("status") as string) || "active"
     const medicalNotes = formData.get("medicalNotes") as string
 
     await db.insert(students).values({

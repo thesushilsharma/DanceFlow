@@ -11,7 +11,6 @@ export async function getPayments() {
       .select({
         id: payments.id,
         amount: payments.amount,
-        dueDate: payments.dueDate,
         paymentDate: payments.paymentDate,
         status: payments.status,
         paymentMethod: payments.paymentMethod,
@@ -31,7 +30,7 @@ export async function getPayments() {
       studentLastName: payment.studentLastName,
       amount: payment.amount,
       paidDate: payment.paymentDate ? String(payment.paymentDate) : null,
-      dueDate: payment.dueDate ? String(payment.dueDate) : "",
+      dueDate: "", // due_date column doesn't exist in database
       method: payment.paymentMethod,
       status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
       notes: payment.notes,
@@ -112,7 +111,6 @@ export async function createPayment(formData: FormData) {
   try {
     const studentId = formData.get("studentId") as string
     const amount = formData.get("amount") as string
-    const dueDate = formData.get("dueDate") as string | null
     const paymentDate = formData.get("paymentDate") as string
     const paymentMethod = formData.get("paymentMethod") as string | null
     const paymentType = formData.get("paymentType") as string | null
@@ -123,7 +121,6 @@ export async function createPayment(formData: FormData) {
     await db.insert(payments).values({
       studentId,
       amount,
-      dueDate: dueDate || undefined,
       paymentDate,
       paymentMethod: paymentMethod || undefined,
       paymentType: paymentType || undefined,

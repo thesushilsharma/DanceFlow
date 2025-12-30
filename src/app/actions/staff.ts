@@ -20,7 +20,7 @@ export async function createStaff(formData: FormData) {
     const lastName = formData.get("lastName") as string
     const email = formData.get("email") as string
     const phone = formData.get("phone") as string
-    const role = formData.get("role") as any
+    const role = formData.get("role") as string
     const specialization = formData.get("specialization") as string
     const hireDate = formData.get("hireDate") as string
     const salary = formData.get("salary") as string
@@ -32,9 +32,9 @@ export async function createStaff(formData: FormData) {
       email,
       phone,
       role,
-      specialization,
+      specializations: specialization ? [specialization] : undefined,
       hireDate,
-      salary,
+      salary: salary ? salary : undefined,
       status,
     })
 
