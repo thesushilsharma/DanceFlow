@@ -37,41 +37,66 @@ export async function getClasses() {
   }
 }
 
-export async function createClass(formData: FormData) {
+type CreateClassState = {
+  success?: boolean
+  error?: string
+} | null
+
+export async function createClass(
+  prevState: CreateClassState,
+  formData: FormData
+): Promise<CreateClassState> {
   try {
     const name = formData.get("name") as string
     const type = formData.get("type") as string
-    const level = formData.get("level") as string
-    const instructorId = formData.get("instructorId") as string
+    const level = formData.get("level") as string | null
+    const instructorId = formData.get("instructorId") as string | null
     const dayOfWeek = formData.get("dayOfWeek") as string
     const startTime = formData.get("startTime") as string
     const endTime = formData.get("endTime") as string
-    const room = formData.get("room") as string
-    const capacity = Number.parseInt(formData.get("capacity") as string)
-    const tuition = formData.get("tuition") as string
-    const status = (formData.get("status") as any) || "active"
-    const startDate = formData.get("startDate") as string
+    const room = formData.get("room") as string | null
+    const capacityStr = formData.get("capacity") as string
+    const tuition = formData.get("tuition") as string | null
+    const status = (formData.get("status") as string) || "active"
+    const description = formData.get("description") as string | null
+
+    // Validate required fields
+    if (!name || !type || !dayOfWeek || !startTime || !endTime || !capacityStr) {
+      return { success: false, error: "Please fill in all required fields" }
+    }
+
+    const capacity = Number.parseInt(capacityStr, 10)
+    if (isNaN(capacity) || capacity <= 0) {
+      return { success: false, error: "Capacity must be a positive number" }
+    }
+
+    // Convert empty strings to null for optional fields
+    const cleanDescription = description && description.trim() ? description.trim() : null
+    const cleanLevel = level && level.trim() ? level.trim() : null
+    const cleanRoom = room && room.trim() ? room.trim() : null
+    const cleanInstructorId = instructorId && instructorId.trim() ? instructorId.trim() : null
+    const cleanTuition = tuition && tuition.trim() ? tuition.trim() : null
 
     await db.insert(classes).values({
-      name,
+      name: name.trim(),
+      description: cleanDescription,
       classType: type,
-      level,
-      instructorId: instructorId || null,
+      level: cleanLevel,
+      instructorId: cleanInstructorId,
       dayOfWeek,
       startTime,
       endTime,
-      room,
+      room: cleanRoom,
       maxCapacity: capacity,
-      tuitionFee: tuition,
+      tuitionFee: cleanTuition,
       status,
-      startDate,
     })
 
     revalidatePath("/dashboard/classes")
     return { success: true }
   } catch (error) {
     console.error("Error creating class:", error)
-    return { success: false, error: "Failed to create class" }
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create class" }
   }
 }
 
