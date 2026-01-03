@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,9 +16,27 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { createStaff } from "@/app/actions/staff"
+import { toast } from "sonner"
 
 export function AddStaffDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+
+    startTransition(async () => {
+      const result = await createStaff(formData)
+      if (result.success) {
+        toast.success("Staff member added successfully")
+        setOpen(false)
+      } else {
+        toast.error(result.error || "Failed to add staff member")
+      }
+    })
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -28,63 +46,64 @@ export function AddStaffDialog({ children }: { children: React.ReactNode }) {
           <DialogTitle>Add Staff Member</DialogTitle>
           <DialogDescription>Add a new instructor or staff member to your team.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input id="firstName" placeholder="Sarah" />
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input id="firstName" name="firstName" placeholder="Sarah" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input id="lastName" name="lastName" placeholder="Johnson" required />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input id="lastName" placeholder="Johnson" />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="sarah.j@dancestudio.com" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" placeholder="sarah.j@dancestudio.com" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input id="phone" name="phone" placeholder="555-0101" required />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" placeholder="555-0101" />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select>
-                <SelectTrigger id="role">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select name="role" required>
+                  <SelectTrigger id="role">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="instructor">Instructor</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="assistant">Assistant</SelectItem>
-                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="Instructor">Instructor</SelectItem>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Assistant">Assistant</SelectItem>
+                  <SelectItem value="Owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="hireDate">Hire Date</Label>
-              <Input id="hireDate" type="date" />
+              <Input id="hireDate" name="hireDate" type="date" required />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="specializations">Specializations</Label>
-            <Input id="specializations" placeholder="Ballet, Contemporary, Jazz (comma-separated)" />
+            <Input id="specializations" name="specialization" placeholder="Ballet, Contemporary, Jazz (comma-separated)" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="salary">Salary</Label>
-              <Input id="salary" type="number" placeholder="45000" />
+              <Input id="salary" name="salary" type="number" placeholder="45000" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select defaultValue="active">
+              <Select name="status" defaultValue="active">
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
@@ -99,20 +118,23 @@ export function AddStaffDialog({ children }: { children: React.ReactNode }) {
 
           <div className="space-y-2">
             <Label htmlFor="certifications">Certifications</Label>
-            <Textarea id="certifications" placeholder="List certifications..." rows={2} />
+            <Textarea id="certifications" name="certifications" placeholder="List certifications..." rows={2} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" placeholder="Additional notes..." rows={2} />
+            <Textarea id="notes" name="notes" placeholder="Additional notes..." rows={2} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
             Cancel
           </Button>
-          <Button onClick={() => setOpen(false)}>Add Staff Member</Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "Adding..." : "Add Staff Member"}
+          </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

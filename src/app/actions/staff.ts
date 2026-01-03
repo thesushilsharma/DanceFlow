@@ -7,7 +7,12 @@ import { eq } from "drizzle-orm"
 
 export async function getStaff() {
   try {
-    return await db.select().from(staff)
+    const staffData = await db.select().from(staff)
+    // Transform data to include name field for table display
+    return staffData.map((s) => ({
+      ...s,
+      name: `${s.firstName} ${s.lastName}`,
+    }))
   } catch (error) {
     console.error("Error fetching staff:", error)
     throw new Error("Failed to fetch staff")
@@ -26,13 +31,18 @@ export async function createStaff(formData: FormData) {
     const salary = formData.get("salary") as string
     const status = (formData.get("status") as string) || "active"
 
+    // Handle comma-separated specializations
+    const specializations = specialization
+      ? specialization.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+      : undefined
+
     await db.insert(staff).values({
       firstName,
       lastName,
       email,
       phone,
       role,
-      specializations: specialization ? [specialization] : undefined,
+      specializations,
       hireDate,
       salary: salary ? salary : undefined,
       status,
