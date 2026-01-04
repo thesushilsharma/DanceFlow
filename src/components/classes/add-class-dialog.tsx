@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useTransition, useEffect } from "react"
+import { useState, useEffect, useRef, useOptimistic, startTransition, useActionState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -20,6 +20,16 @@ import { createClass } from "@/app/actions/classes"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
+type FormState = {
+  success?: boolean
+  error?: string
+} | null
+
+type OptimisticState = {
+  isSubmitting: boolean
+  message?: string
+}
+
 export function AddClassDialog({
   children,
   staff,
@@ -28,8 +38,8 @@ export function AddClassDialog({
   staff: Array<{ id: string; firstName: string; lastName: string }>
 }) {
   const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const formRef = useRef<HTMLFormElement>(null)
 
   // State for Select components (they don't work with native form submission)
   const [type, setType] = useState<string>("")
@@ -37,6 +47,15 @@ export function AddClassDialog({
   const [dayOfWeek, setDayOfWeek] = useState<string>("")
   const [instructorId, setInstructorId] = useState<string>("")
   const [status, setStatus] = useState<string>("active")
+
+  // useActionState for form state management
+  const [state, formAction, isPending] = useActionState<FormState, FormData>(createClass, null)
+
+  // useOptimistic for immediate UI feedback
+  const [optimisticState, setOptimisticState] = useOptimistic<OptimisticState, OptimisticState>(
+    { isSubmitting: false },
+    (_currentState, optimisticValue) => optimisticValue
+  )
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -46,46 +65,47 @@ export function AddClassDialog({
       setDayOfWeek("")
       setInstructorId("")
       setStatus("active")
+      if (formRef.current) {
+        formRef.current.reset()
+      }
     }
   }, [open])
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
+  // Handle success/error states
+  useEffect(() => {
+    if (state?.success && open) {
+      toast.success("Class created successfully")
+      setOpen(false)
+      router.refresh()
+      // Reset optimistic state
+      startTransition(() => {
+        setOptimisticState({ isSubmitting: false })
+      })
+    } else if (state?.error && open) {
+      toast.error(state.error)
+      // Reset optimistic state on error
+      startTransition(() => {
+        setOptimisticState({ isSubmitting: false })
+      })
+    }
+  }, [state, open, router, setOptimisticState])
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     // Validate required Select fields
     if (!type) {
+      e.preventDefault()
       toast.error("Please select a class type")
       return
     }
     if (!dayOfWeek) {
+      e.preventDefault()
       toast.error("Please select a day of week")
       return
     }
 
-    // Add Select values to FormData
-    formData.set("type", type)
-    if (level) formData.set("level", level)
-    formData.set("dayOfWeek", dayOfWeek)
-    if (instructorId) formData.set("instructorId", instructorId)
-    formData.set("status", status)
-
-    startTransition(async () => {
-      const result = await createClass(null, formData)
-      if (result?.success) {
-        toast.success("Class created successfully")
-        setOpen(false)
-        // Reset form
-        setType("")
-        setLevel("")
-        setDayOfWeek("")
-        setInstructorId("")
-        setStatus("active")
-        e.currentTarget.reset()
-        router.refresh()
-      } else {
-        toast.error(result?.error || "Failed to create class")
-      }
+    // Optimistic update - show immediate feedback
+    startTransition(() => {
+      setOptimisticState({ isSubmitting: true, message: "Creating class..." })
     })
   }
 
@@ -97,17 +117,24 @@ export function AddClassDialog({
           <DialogTitle>Add New Class</DialogTitle>
           <DialogDescription>Create a new class and set its schedule.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form ref={formRef} action={formAction} onSubmit={handleSubmit}>
+          {/* Hidden inputs for Select values (they don't work with native form submission) */}
+          <input type="hidden" name="type" value={type} />
+          <input type="hidden" name="level" value={level} />
+          <input type="hidden" name="dayOfWeek" value={dayOfWeek} />
+          <input type="hidden" name="instructorId" value={instructorId} />
+          <input type="hidden" name="status" value={status} />
+          
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Class Name</Label>
-              <Input id="name" name="name" placeholder="Ballet Fundamentals" required disabled={isPending} />
+              <Input id="name" name="name" placeholder="Ballet Fundamentals" required disabled={isPending || optimisticState.isSubmitting} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="type">Class Type</Label>
-                <Select value={type} onValueChange={setType} required disabled={isPending}>
+                <Select value={type} onValueChange={setType} required disabled={isPending || optimisticState.isSubmitting}>
                   <SelectTrigger id="type">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -123,7 +150,7 @@ export function AddClassDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="level">Level</Label>
-                <Select value={level} onValueChange={setLevel} disabled={isPending}>
+                <Select value={level} onValueChange={setLevel} disabled={isPending || optimisticState.isSubmitting}>
                   <SelectTrigger id="level">
                     <SelectValue placeholder="Select level" />
                   </SelectTrigger>
@@ -138,13 +165,13 @@ export function AddClassDialog({
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" placeholder="Class description..." rows={3} disabled={isPending} />
+              <Textarea id="description" name="description" placeholder="Class description..." rows={3} disabled={isPending || optimisticState.isSubmitting} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dayOfWeek">Day of Week</Label>
-                <Select value={dayOfWeek} onValueChange={setDayOfWeek} required disabled={isPending}>
+                <Select value={dayOfWeek} onValueChange={setDayOfWeek} required disabled={isPending || optimisticState.isSubmitting}>
                   <SelectTrigger id="dayOfWeek">
                     <SelectValue placeholder="Select day" />
                   </SelectTrigger>
@@ -161,25 +188,25 @@ export function AddClassDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="room">Room</Label>
-                <Input id="room" name="room" placeholder="Studio A" disabled={isPending} />
+                <Input id="room" name="room" placeholder="Studio A" disabled={isPending || optimisticState.isSubmitting} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="startTime">Start Time</Label>
-                <Input id="startTime" name="startTime" type="time" required disabled={isPending} />
+                <Input id="startTime" name="startTime" type="time" required disabled={isPending || optimisticState.isSubmitting} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="endTime">End Time</Label>
-                <Input id="endTime" name="endTime" type="time" required disabled={isPending} />
+                <Input id="endTime" name="endTime" type="time" required disabled={isPending || optimisticState.isSubmitting} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="instructorId">Instructor</Label>
-                <Select value={instructorId} onValueChange={setInstructorId} disabled={isPending}>
+                <Select value={instructorId} onValueChange={setInstructorId} disabled={isPending || optimisticState.isSubmitting}>
                   <SelectTrigger id="instructorId">
                     <SelectValue placeholder="Select instructor" />
                   </SelectTrigger>
@@ -194,18 +221,18 @@ export function AddClassDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="capacity">Max Capacity</Label>
-                <Input id="capacity" name="capacity" type="number" placeholder="15" required disabled={isPending} />
+                <Input id="capacity" name="capacity" type="number" placeholder="15" required disabled={isPending || optimisticState.isSubmitting} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="tuition">Tuition Fee</Label>
-                <Input id="tuition" name="tuition" type="number" step="0.01" placeholder="120.00" disabled={isPending} />
+                <Input id="tuition" name="tuition" type="number" step="0.01" placeholder="120.00" disabled={isPending || optimisticState.isSubmitting} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={setStatus} disabled={isPending}>
+                <Select value={status} onValueChange={setStatus} disabled={isPending || optimisticState.isSubmitting}>
                   <SelectTrigger id="status">
                     <SelectValue />
                   </SelectTrigger>
@@ -219,11 +246,18 @@ export function AddClassDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending || optimisticState.isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Adding..." : "Add Class"}
+            <Button type="submit" disabled={isPending || optimisticState.isSubmitting}>
+              {isPending || optimisticState.isSubmitting ? (
+                <>
+                  <span className="mr-2">Adding...</span>
+                  {optimisticState.message && <span className="text-xs opacity-75">{optimisticState.message}</span>}
+                </>
+              ) : (
+                "Add Class"
+              )}
             </Button>
           </DialogFooter>
         </form>
