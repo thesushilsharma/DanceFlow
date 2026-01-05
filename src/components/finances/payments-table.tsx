@@ -10,7 +10,6 @@ interface Payment {
   studentLastName: string | null
   amount: string
   paidDate: string | null
-  dueDate: string
   method: string | null
   status: "paid" | "pending" | "overdue" | "cancelled"
   notes: string | null
@@ -33,7 +32,6 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
           <TableRow>
             <TableHead>Student</TableHead>
             <TableHead>Amount</TableHead>
-            <TableHead>Due Date</TableHead>
             <TableHead>Paid Date</TableHead>
             <TableHead>Method</TableHead>
             <TableHead>Status</TableHead>
@@ -48,7 +46,6 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
                   : "Unknown Student"}
               </TableCell>
               <TableCell>${Number.parseFloat(payment.amount).toFixed(2)}</TableCell>
-              <TableCell>{payment.dueDate || "N/A"}</TableCell>
               <TableCell>{payment.paidDate || "-"}</TableCell>
               <TableCell>{payment.method || "-"}</TableCell>
               <TableCell>

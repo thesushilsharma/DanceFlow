@@ -30,7 +30,6 @@ export async function getPayments() {
       studentLastName: payment.studentLastName,
       amount: payment.amount,
       paidDate: payment.paymentDate ? String(payment.paymentDate) : null,
-      dueDate: "", // due_date column doesn't exist in database
       method: payment.paymentMethod,
       status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
       notes: payment.notes,
