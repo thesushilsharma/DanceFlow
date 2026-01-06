@@ -152,7 +152,15 @@ export async function createPayment(
   }
 }
 
-export async function createExpense(formData: FormData) {
+type ExpenseState = {
+  success?: boolean
+  error?: string
+} | null
+
+export async function createExpense(
+  _prevState: ExpenseState,
+  formData: FormData
+): Promise<ExpenseState> {
   try {
     const category = formData.get("category") as string
     const description = formData.get("description") as string
@@ -162,14 +170,19 @@ export async function createExpense(formData: FormData) {
     const paymentMethod = formData.get("paymentMethod") as string
     const notes = formData.get("notes") as string
 
+    // Validate required fields
+    if (!category || !description || !amount || !date) {
+      return { success: false, error: "Please fill in all required fields" }
+    }
+
     await db.insert(expenses).values({
       category,
       description,
       amount,
       expenseDate: date,
-      vendor,
-      paymentMethod,
-      notes,
+      vendor: vendor || undefined,
+      paymentMethod: paymentMethod || undefined,
+      notes: notes || undefined,
     })
 
     revalidatePath("/dashboard/finances")

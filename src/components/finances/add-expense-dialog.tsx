@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useTransition } from "react"
+import { useState, useEffect, useActionState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,22 +21,17 @@ import { toast } from "sonner"
 
 export function AddExpenseDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [state, formAction, isPending] = useActionState(createExpense, null)
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-
-    startTransition(async () => {
-      const result = await createExpense(formData)
-      if (result.success) {
-        toast.success("Expense added successfully")
-        setOpen(false)
-      } else {
-        toast.error(result.error || "Failed to add expense")
-      }
-    })
-  }
+  // Handle success/error states
+  useEffect(() => {
+    if (state?.success && open) {
+      toast.success("Expense added successfully")
+      setOpen(false)
+    } else if (state?.error && open) {
+      toast.error(state.error)
+    }
+  }, [state, open])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -46,7 +41,7 @@ export function AddExpenseDialog({ children }: { children: React.ReactNode }) {
           <DialogTitle>Add Expense</DialogTitle>
           <DialogDescription>Record a new business expense.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form action={formAction}>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="category">Category *</Label>
