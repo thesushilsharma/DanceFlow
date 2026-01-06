@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useTransition, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useActionState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils"
 
 export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [state, formAction, isPending] = useActionState(createPayment, null)
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Array<{ id: string; firstName: string; lastName: string; email: string | null }>>([])
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; firstName: string; lastName: string } | null>(null)
@@ -62,8 +62,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (open && !hasLoadedInitialRef.current && !searchQuery) {
       hasLoadedInitialRef.current = true
-      startTransition(async () => {
-        const results = await getStudents()
+      getStudents().then((results) => {
         setStudents(results.slice(0, 10)) // Show first 10 initially
       })
     }
@@ -83,26 +82,17 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     }
   }, [open])
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!selectedStudent) {
-      toast.error("Please select a student")
-      return
+  // Handle success/error states
+  useEffect(() => {
+    if (state?.success && open) {
+      toast.success("Payment added successfully")
+      setOpen(false)
+      // Reset form
+      setSelectedStudent(null)
+    } else if (state?.error && open) {
+      toast.error(state.error)
     }
-
-    const formData = new FormData(e.currentTarget)
-    formData.set("studentId", selectedStudent.id)
-
-    startTransition(async () => {
-      const result = await createPayment(formData)
-      if (result.success) {
-        toast.success("Payment added successfully")
-        setOpen(false)
-      } else {
-        toast.error(result.error || "Failed to add payment")
-      }
-    })
-  }
+  }, [state, open])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -112,7 +102,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
           <DialogTitle>Add Payment</DialogTitle>
           <DialogDescription>Record a new payment from a student.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form action={formAction}>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="student">Student *</Label>

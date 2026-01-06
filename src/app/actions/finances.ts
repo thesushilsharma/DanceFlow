@@ -106,7 +106,15 @@ export async function getFinancialSummary() {
   }
 }
 
-export async function createPayment(formData: FormData) {
+type PaymentState = {
+  success?: boolean
+  error?: string
+} | null
+
+export async function createPayment(
+  _prevState: PaymentState,
+  formData: FormData
+): Promise<PaymentState> {
   try {
     const studentId = formData.get("studentId") as string
     const amount = formData.get("amount") as string
@@ -116,6 +124,14 @@ export async function createPayment(formData: FormData) {
     const referenceNumber = formData.get("referenceNumber") as string | null
     const status = (formData.get("status") as string) || "completed"
     const notes = formData.get("notes") as string | null
+
+    // Validate required fields
+    if (!studentId) {
+      return { success: false, error: "Please select a student" }
+    }
+    if (!amount || !paymentDate) {
+      return { success: false, error: "Please fill in all required fields" }
+    }
 
     await db.insert(payments).values({
       studentId,
