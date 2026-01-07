@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -96,7 +98,9 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem>View Details</DropdownMenuItem>
-                  <DropdownMenuItem>Manage Participants</DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/events/${event.id}/participants`}>Manage Participants</Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem>Edit Event</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(event.id)}>
@@ -134,8 +138,8 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
             </div>
           </CardContent>
           <CardFooter>
-            <Button variant="outline" className="w-full bg-transparent">
-              Manage Participants
+            <Button asChild variant="outline" className="w-full bg-transparent">
+              <Link href={`/dashboard/events/${event.id}/participants`}>Manage Participants</Link>
             </Button>
           </CardFooter>
         </Card>
