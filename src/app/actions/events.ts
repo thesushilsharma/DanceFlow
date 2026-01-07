@@ -27,7 +27,7 @@ export async function getEvents() {
   }
 }
 
-export async function createEvent(formData: FormData) {
+export async function createEvent(prevState: any, formData: FormData) {
   try {
     const name = formData.get("name") as string
     const eventType = formData.get("type") as "recital" | "competition" | "workshop" | "showcase" | "other"
@@ -47,7 +47,7 @@ export async function createEvent(formData: FormData) {
       location,
       description,
       cost,
-      status: "upcoming",
+      status: (formData.get("status") as string) || "scheduled",
     })
 
     revalidatePath("/dashboard/events")
