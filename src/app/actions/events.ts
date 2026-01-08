@@ -101,7 +101,7 @@ export async function getEventDetails(eventId: string) {
       })),
     }
   } catch (error) {
-    console.error("[v0] Failed to fetch event details:", error)
+    console.error("Failed to fetch event details:", error)
     return null
   }
 }
@@ -137,7 +137,7 @@ export async function updateEvent(eventId: string, formData: FormData) {
     revalidatePath("/dashboard/events")
     return { success: true, message: "Event updated successfully" }
   } catch (error) {
-    console.error("[v0] Failed to update event:", error)
+    console.error("Failed to update event:", error)
     return { success: false, error: "Failed to update event" }
   }
 }
@@ -153,7 +153,7 @@ export async function addEventParticipant(eventId: string, studentId: string) {
     revalidatePath("/dashboard/events")
     return { success: true, message: "Participant added successfully" }
   } catch (error) {
-    console.error("[v0] Failed to add participant:", error)
+    console.error("Failed to add participant:", error)
     return { success: false, error: "Failed to add participant" }
   }
 }
@@ -165,7 +165,7 @@ export async function removeEventParticipant(participantId: string) {
     revalidatePath("/dashboard/events")
     return { success: true, message: "Participant removed successfully" }
   } catch (error) {
-    console.error("[v0] Failed to remove participant:", error)
+    console.error("Failed to remove participant:", error)
     return { success: false, error: "Failed to remove participant" }
   }
 }
@@ -186,7 +186,7 @@ export async function getStudentsForEvent() {
       name: `${s.name} ${s.lastName}`,
     }))
   } catch (error) {
-    console.error("[v0] Failed to fetch students:", error)
+    console.error("Failed to fetch students:", error)
     return []
   }
 }
