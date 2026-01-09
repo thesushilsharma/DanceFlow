@@ -1,7 +1,6 @@
 "use client"
 
-import Link from "next/link"
-
+import { useState, useEffect, useOptimistic, useTransition  } from "react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,8 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { deleteEvent } from "@/app/actions/events"
-import { useOptimistic, useTransition } from "react"
+import { deleteEvent, getEventDetails, getStudentsForEvent } from "@/app/actions/events"
+import { EventDetailsDialog } from "./event-details-dialog"
+import { ManageParticipantsDialog } from "./manage-participants-dialog"
+import { EditEventDialog } from "./edit-event-dialog"
 
 interface Event {
   id: string
@@ -51,11 +52,45 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
   const [isPending, startTransition] = useTransition()
   const [optimisticEvents, setOptimisticEvents] = useOptimistic(initialEvents)
 
+  
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [participantsOpen, setParticipantsOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<any>(null)
+  const [allStudents, setAllStudents] = useState<Array<{ id: string; name: string }>>([])
+
+  useEffect(() => {
+    async function fetchStudents() {
+      const students = await getStudentsForEvent()
+      setAllStudents(students)
+    }
+    fetchStudents()
+  }, [])
+
   const handleDelete = (eventId: string) => {
     startTransition(async () => {
       setOptimisticEvents(optimisticEvents.filter((e) => e.id !== eventId))
       await deleteEvent(eventId)
     })
+  }
+
+  
+  const handleViewDetails = async (eventId: string) => {
+    const details = await getEventDetails(eventId)
+    setSelectedEvent(details)
+    setDetailsOpen(true)
+  }
+
+  const handleManageParticipants = async (eventId: string) => {
+    const details = await getEventDetails(eventId)
+    setSelectedEvent(details)
+    setParticipantsOpen(true)
+  }
+
+  const handleEditEvent = async (eventId: string) => {
+    const details = await getEventDetails(eventId)
+    setSelectedEvent(details)
+    setEditOpen(true)
   }
 
   const formatTimeRange = (startTime: string | null, endTime: string | null) => {
@@ -64,7 +99,8 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <>
+     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {optimisticEvents.map((event) => (
         <Card key={event.id} className={`flex flex-col ${isPending ? "opacity-50" : ""}`}>
           <CardHeader>
@@ -75,8 +111,10 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
                   <Badge
                     variant="secondary"
                     className={
-                      typeColors[(event.type.charAt(0).toUpperCase() + event.type.slice(1)) as keyof typeof typeColors]
-                    }
+                      typeColors[
+                          (event.type.charAt(0).toUpperCase() + event.type.slice(1)) as keyof typeof typeColors
+                        ]
+                      }
                   >
                     {event.type.charAt(0).toUpperCase() + event.type.slice(1)}
                   </Badge>
@@ -97,11 +135,11 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>View Details</DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/dashboard/events/${event.id}/participants`}>Manage Participants</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>Edit Event</DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => handleViewDetails(event.id)}>View Details</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleManageParticipants(event.id)}>
+                      Manage Participants
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleEditEvent(event.id)}>Edit Event</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(event.id)}>
                     Cancel Event
@@ -138,12 +176,25 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
             </div>
           </CardContent>
           <CardFooter>
-            <Button asChild variant="outline" className="w-full bg-transparent">
-              <Link href={`/dashboard/events/${event.id}/participants`}>Manage Participants</Link>
+            <Button
+                variant="outline"
+                className="w-full bg-transparent"
+                onClick={() => handleManageParticipants(event.id)}
+                disabled={isPending}
+              >Manage Participants
             </Button>
           </CardFooter>
         </Card>
       ))}
     </div>
+     <EventDetailsDialog event={selectedEvent} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <ManageParticipantsDialog
+        event={selectedEvent}
+        allStudents={allStudents}
+        open={participantsOpen}
+        onOpenChange={setParticipantsOpen}
+      />
+      <EditEventDialog event={selectedEvent} open={editOpen} onOpenChange={setEditOpen} />
+    </>
   )
 }
