@@ -4,8 +4,15 @@ import { useState, useTransition, useOptimistic } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X, Plus } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { X, Plus, Check } from "lucide-react"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { addEventParticipant, removeEventParticipant } from "@/app/actions/events"
 import { toast } from "sonner";
 
@@ -30,7 +37,7 @@ interface ManageParticipantsDialogProps {
 }
 
 export function ManageParticipantsDialog({ event, allStudents, open, onOpenChange, onEventUpdated }: ManageParticipantsDialogProps) {
-  const [selectedStudent, setSelectedStudent] = useState<string>("")
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
 
   const [optimisticParticipants, addOptimisticParticipant] = useOptimistic(
@@ -59,31 +66,39 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
 
   if (!event) return null
 
-  const handleAddParticipant = () => {
-    if (!selectedStudent) return
-
-    const studentToAdd = allStudents.find((s) => s.id === selectedStudent)
-    if (!studentToAdd) return
+  const handleAddParticipants = () => {
+    if (selectedStudents.length === 0) return
 
     startTransition(async () => {
-      // Optimistic update
-      addOptimisticParticipant({
-        type: "add",
-        participant: {
-          id: `temp-${Date.now()}`, // Temporary ID
-          studentId: studentToAdd.id,
-          studentName: studentToAdd.name,
-          status: "registered",
-        },
+      const promises = selectedStudents.map(async (studentId) => {
+        const studentToAdd = allStudents.find((s) => s.id === studentId)
+        if (!studentToAdd) return
+
+        // Optimistic update
+        addOptimisticParticipant({
+          type: "add",
+          participant: {
+            id: `temp-${Date.now()}-${studentId}`, // Unique temp ID
+            studentId: studentToAdd.id,
+            studentName: studentToAdd.name,
+            status: "registered",
+          },
+        })
+
+        return addEventParticipant(event.id, studentId)
       })
 
-      const result = await addEventParticipant(event.id, selectedStudent)
-      if (result.success) {
-        toast.success(result.message)
-        setSelectedStudent("")
+      const results = await Promise.all(promises)
+      const allSuccess = results.every(r => r?.success)
+
+      if (allSuccess) {
+        toast.success(`Successfully added ${selectedStudents.length} participant(s)`)
+        setSelectedStudents([])
         await onEventUpdated()
       } else {
-        toast.error(result.error)
+        toast.error("Failed to add some participants")
+        // Force refresh to sync state in case of partial failure
+        await onEventUpdated()
       }
     })
   }
@@ -96,7 +111,6 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
       const result = await removeEventParticipant(participantId)
       if (result.success) {
         toast.success(result.message)
-        setSelectedStudent("")
         await onEventUpdated()
       } else {
         toast.error(result.error)
@@ -114,22 +128,50 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
           <DialogTitle>Manage Participants - {event.name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select student" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStudents.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleAddParticipant} disabled={!selectedStudent || isPending}>
+          <div className="flex gap-2 items-start">
+            <div className="flex-1 space-y-2">
+              <Command className="rounded-lg border shadow-md">
+                <CommandInput placeholder="Search students..." />
+                <CommandList>
+                  <CommandEmpty>No student found.</CommandEmpty>
+                  <CommandGroup className="max-h-64 overflow-y-auto">
+                    {availableStudents.map((student) => (
+                      <CommandItem
+                        key={student.id}
+                        value={student.name}
+                        onSelect={() => {
+                          setSelectedStudents((prev) =>
+                            prev.includes(student.id)
+                              ? prev.filter((id) => id !== student.id)
+                              : [...prev, student.id]
+                          )
+                        }}
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <div
+                            className={`h-4 w-4 border rounded-sm flex items-center justify-center ${selectedStudents.includes(student.id)
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-primary opacity-50"
+                              }`}
+                          >
+                            {selectedStudents.includes(student.id) && <Check className="h-3 w-3" />}
+                          </div>
+                          <span>{student.name}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+              {selectedStudents.length > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {selectedStudents.length} student{selectedStudents.length > 1 ? "s" : ""} selected
+                </div>
+              )}
+            </div>
+            <Button onClick={handleAddParticipants} disabled={selectedStudents.length === 0 || isPending}>
               <Plus className="h-4 w-4 mr-2" />
-              Add
+              Add Selected
             </Button>
           </div>
 
