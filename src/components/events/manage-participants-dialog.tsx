@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useOptimistic } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -26,22 +26,62 @@ interface ManageParticipantsDialogProps {
   }>
   open: boolean
   onOpenChange: (open: boolean) => void
+  onEventUpdated: () => Promise<void>
 }
 
-export function ManageParticipantsDialog({ event, allStudents, open, onOpenChange }: ManageParticipantsDialogProps) {
+export function ManageParticipantsDialog({ event, allStudents, open, onOpenChange, onEventUpdated }: ManageParticipantsDialogProps) {
   const [selectedStudent, setSelectedStudent] = useState<string>("")
   const [isPending, startTransition] = useTransition()
+
+  const [optimisticParticipants, addOptimisticParticipant] = useOptimistic(
+    event?.participants || [],
+    (
+      state,
+      action: {
+        type: "add" | "remove"
+        participant?: {
+          id: string
+          studentId: string | null
+          studentName: string
+          status: string | null
+        }
+        id?: string
+      }
+    ) => {
+      if (action.type === "add" && action.participant) {
+        return [...state, action.participant]
+      } else if (action.type === "remove") {
+        return state.filter((p) => p.id !== action.id)
+      }
+      return state
+    }
+  )
 
   if (!event) return null
 
   const handleAddParticipant = () => {
     if (!selectedStudent) return
 
+    const studentToAdd = allStudents.find((s) => s.id === selectedStudent)
+    if (!studentToAdd) return
+
     startTransition(async () => {
+      // Optimistic update
+      addOptimisticParticipant({
+        type: "add",
+        participant: {
+          id: `temp-${Date.now()}`, // Temporary ID
+          studentId: studentToAdd.id,
+          studentName: studentToAdd.name,
+          status: "registered",
+        },
+      })
+
       const result = await addEventParticipant(event.id, selectedStudent)
       if (result.success) {
         toast.success(result.message)
         setSelectedStudent("")
+        await onEventUpdated()
       } else {
         toast.error(result.error)
       }
@@ -50,17 +90,21 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
 
   const handleRemoveParticipant = (participantId: string) => {
     startTransition(async () => {
+      // Optimistic update
+      addOptimisticParticipant({ type: "remove", id: participantId })
+
       const result = await removeEventParticipant(participantId)
       if (result.success) {
         toast.success(result.message)
         setSelectedStudent("")
+        await onEventUpdated()
       } else {
         toast.error(result.error)
       }
     })
   }
 
-  const enrolledStudentIds = new Set(event.participants.map((p) => p.studentId).filter(Boolean))
+  const enrolledStudentIds = new Set(optimisticParticipants.map((p) => p.studentId).filter(Boolean))
   const availableStudents = allStudents.filter((s) => !enrolledStudentIds.has(s.id))
 
   return (
@@ -90,12 +134,12 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
           </div>
 
           <div>
-            <h4 className="text-sm font-medium mb-3">Current Participants ({event.participants.length})</h4>
+            <h4 className="text-sm font-medium mb-3">Current Participants ({optimisticParticipants.length})</h4>
             <div className="space-y-2">
-              {event.participants.length === 0 ? (
+              {optimisticParticipants.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No participants yet</p>
               ) : (
-                event.participants.map((participant) => (
+                optimisticParticipants.map((participant) => (
                   <div key={participant.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium">{participant.studentName}</span>
