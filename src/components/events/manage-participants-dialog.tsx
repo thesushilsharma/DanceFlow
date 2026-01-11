@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useOptimistic } from "react"
+import { useState, useTransition, useOptimistic, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -39,13 +39,14 @@ interface ManageParticipantsDialogProps {
 export function ManageParticipantsDialog({ event, allStudents, open, onOpenChange, onEventUpdated }: ManageParticipantsDialogProps) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
+  const previousEventIdRef = useRef<string | null>(null)
 
   const [optimisticParticipants, addOptimisticParticipant] = useOptimistic(
     event?.participants || [],
     (
       state,
       action: {
-        type: "add" | "remove"
+        type: "add" | "remove" | "sync"
         participant?: {
           id: string
           studentId: string | null
@@ -53,8 +54,17 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
           status: string | null
         }
         id?: string
+        participants?: Array<{
+          id: string
+          studentId: string | null
+          studentName: string
+          status: string | null
+        }>
       }
     ) => {
+      if (action.type === "sync" && action.participants) {
+        return action.participants
+      }
       if (action.type === "add" && action.participant) {
         return [...state, action.participant]
       } else if (action.type === "remove") {
@@ -63,6 +73,20 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
       return state
     }
   )
+
+  // Reset optimistic state when dialog opens with a new event
+  useEffect(() => {
+    if (!open || !event) return
+    
+    // Only reset if event ID changed (dialog reopened with different event)
+    if (previousEventIdRef.current !== event.id) {
+      previousEventIdRef.current = event.id
+      addOptimisticParticipant({
+        type: "sync",
+        participants: event.participants || [],
+      })
+    }
+  }, [event?.id, open, addOptimisticParticipant])
 
   if (!event) return null
 
@@ -94,11 +118,16 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
       if (allSuccess) {
         toast.success(`Successfully added ${selectedStudents.length} participant(s)`)
         setSelectedStudents([])
-        await onEventUpdated()
+        // Delay the update to avoid immediate re-render - sync in background
+        setTimeout(() => {
+          onEventUpdated().catch(console.error)
+        }, 300)
       } else {
         toast.error("Failed to add some participants")
         // Force refresh to sync state in case of partial failure
-        await onEventUpdated()
+        setTimeout(() => {
+          onEventUpdated().catch(console.error)
+        }, 300)
       }
     })
   }
@@ -111,7 +140,10 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
       const result = await removeEventParticipant(participantId)
       if (result.success) {
         toast.success(result.message)
-        await onEventUpdated()
+        // Delay the update to avoid immediate re-render - sync in background
+        setTimeout(() => {
+          onEventUpdated().catch(console.error)
+        }, 300)
       } else {
         toast.error(result.error)
       }
@@ -182,7 +214,7 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
                 <p className="text-sm text-muted-foreground">No participants yet</p>
               ) : (
                 optimisticParticipants.map((participant) => (
-                  <div key={participant.studentId} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div key={participant.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium">{participant.studentName}</span>
                       <Badge variant="outline" className="text-xs">

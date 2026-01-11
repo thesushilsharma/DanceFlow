@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useOptimistic, useTransition } from "react"
+import { useState, useEffect, useOptimistic, useTransition, useMemo } from "react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,7 +50,20 @@ const statusColors = {
 
 export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
   const [isPending, startTransition] = useTransition()
-  const [optimisticEvents, setOptimisticEvents] = useOptimistic(initialEvents)
+
+  // Ensure unique events based on ID
+  const uniqueInitialEvents = useMemo(() => {
+    const seen = new Set()
+    return initialEvents.filter(event => {
+      if (seen.has(event.id)) {
+        return false
+      }
+      seen.add(event.id)
+      return true
+    })
+  }, [initialEvents])
+
+  const [optimisticEvents, setOptimisticEvents] = useOptimistic(uniqueInitialEvents)
 
 
   const [detailsOpen, setDetailsOpen] = useState(false)
