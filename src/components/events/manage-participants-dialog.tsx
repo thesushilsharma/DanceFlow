@@ -150,8 +150,8 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
                         <div className="flex items-center gap-2 flex-1">
                           <div
                             className={`h-4 w-4 border rounded-sm flex items-center justify-center ${selectedStudents.includes(student.id)
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-primary opacity-50"
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-primary opacity-50"
                               }`}
                           >
                             {selectedStudents.includes(student.id) && <Check className="h-3 w-3" />}
@@ -169,7 +169,7 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
                 </div>
               )}
             </div>
-            <Button onClick={handleAddParticipants} disabled={selectedStudents.length === 0 || isPending}>
+            <Button type="button" onClick={handleAddParticipants} disabled={selectedStudents.length === 0 || isPending}>
               <Plus className="h-4 w-4 mr-2" />
               Add Selected
             </Button>
@@ -182,7 +182,7 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
                 <p className="text-sm text-muted-foreground">No participants yet</p>
               ) : (
                 optimisticParticipants.map((participant) => (
-                  <div key={participant.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div key={participant.studentId} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium">{participant.studentName}</span>
                       <Badge variant="outline" className="text-xs">

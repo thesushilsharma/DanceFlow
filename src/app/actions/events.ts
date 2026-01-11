@@ -8,7 +8,18 @@ import { eq, desc } from "drizzle-orm"
 export async function getEvents() {
   try {
     const allEvents = await db.select().from(events).orderBy(desc(events.eventDate))
-    return allEvents.map((event) => ({
+
+    // Deduplicate events just in case
+    const uniqueEventsMap = new Map()
+    allEvents.forEach(e => {
+      if (uniqueEventsMap.has(e.id)) {
+        console.warn(`Duplicate event ID found: ${e.id}`)
+      } else {
+        uniqueEventsMap.set(e.id, e)
+      }
+    })
+
+    return Array.from(uniqueEventsMap.values()).map((event) => ({
       id: event.id,
       name: event.name,
       type: event.eventType as "recital" | "competition" | "workshop" | "showcase" | "other",
