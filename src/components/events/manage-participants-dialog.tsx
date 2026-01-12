@@ -77,7 +77,7 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
   // Reset optimistic state when dialog opens with a new event
   useEffect(() => {
     if (!open || !event) return
-    
+
     // Only reset if event ID changed (dialog reopened with different event)
     if (previousEventIdRef.current !== event.id) {
       previousEventIdRef.current = event.id
@@ -86,7 +86,7 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
         participants: event.participants || [],
       })
     }
-  }, [event?.id, open, addOptimisticParticipant])
+  }, [event, open, addOptimisticParticipant])
 
   if (!event) return null
 

@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.cursor/mcp.json
+.cursor/rules/nextjs.mdc
+/.agent
