@@ -1,0 +1,1 @@
+Since no external storage service (S3, etc.) is configured, files will be saved locally to public/uploads. This is suitable for development but ephemeral in some production environments (like Vercel).

@@ -4,6 +4,8 @@ import { db } from "@/drizzle/db"
 import { documents } from "@/drizzle/schema"
 import { revalidatePath } from "next/cache"
 import { eq, desc } from "drizzle-orm"
+import fs from "fs/promises"
+import path from "path"
 
 export async function getDocuments() {
   try {
@@ -25,23 +27,37 @@ export async function getDocuments() {
   }
 }
 
-export async function uploadDocument(formData: FormData) {
+export async function uploadDocument(prevState: any, formData: FormData) {
   try {
     const name = formData.get("name") as string
     const type = formData.get("type") as "contract" | "medical" | "waiver" | "certificate" | "other"
     const studentId = formData.get("studentId") as string | null
-    const uploadedBy = formData.get("uploadedBy") as string
-    const fileSize = formData.get("fileSize") ? Number.parseInt(formData.get("fileSize") as string) : null
-    const fileUrl = formData.get("fileUrl") as string // In production, handle actual file upload
+    const uploadedBy = "System" // In a real app, get current user
+    const file = formData.get("file") as File
     const notes = formData.get("notes") as string
+
+    if (!file || file.size === 0) {
+      return { success: false, error: "No file provided" }
+    }
+
+    // Save file locally
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const fileName = `${Date.now()}-${file.name}`
+    const uploadDir = path.join(process.cwd(), "public", "uploads")
+
+    // Ensure directory exists
+    await fs.mkdir(uploadDir, { recursive: true })
+
+    await fs.writeFile(path.join(uploadDir, fileName), buffer)
+    const fileUrl = `/uploads/${fileName}`
 
     await db.insert(documents).values({
       title: name,
       documentType: type,
-      fileName: name, // Using name as fileName for now
-      studentId,
+      fileName: file.name,
+      studentId: studentId && studentId !== "general" ? studentId : null,
       uploadedBy,
-      fileSize,
+      fileSize: file.size,
       fileUrl,
       description: notes,
     })
