@@ -15,6 +15,7 @@ import { MoreHorizontal, Eye, Edit, Trash } from "lucide-react"
 import { deleteStudent } from "@/app/actions/students"
 import { useTransition } from "react"
 import { toast } from "sonner"
+import { formatDate } from "@/lib/date"
 
 type Student = {
   id: string
@@ -91,7 +92,7 @@ export function StudentTable({ students }: { students: Student[] }) {
                 </TableCell>
                 <TableCell>{calculateAge(student.dateOfBirth)}</TableCell>
                 <TableCell>{student.level || "N/A"}</TableCell>
-                <TableCell>{student.enrollmentDate}</TableCell>
+                <TableCell>{student.enrollmentDate ? formatDate(student.enrollmentDate, "SHORT") : "-"}</TableCell>
                 <TableCell>
                   <Badge variant="secondary" className={statusColors[student.status as keyof typeof statusColors]}>
                     {student.status}

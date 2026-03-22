@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, MapPin, DollarSign, Clock, Users } from "lucide-react"
+import { formatDate } from "@/lib/date"
 
 interface EventDetailsDialogProps {
   event: {
@@ -44,7 +45,7 @@ export function EventDetailsDialog({ event, open, onOpenChange }: EventDetailsDi
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>{new Date(event.eventDate).toLocaleDateString()}</span>
+              <span>{event.eventDate ? formatDate(event.eventDate, "SHORT") : "-"}</span>
             </div>
             {event.startTime && (
               <div className="flex items-center gap-2 text-sm">

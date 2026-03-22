@@ -3,12 +3,15 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useOptimistic } from "react"
 import { Badge } from "../ui/badge"
+import { formatDate } from "@/lib/date"
 
 interface Expense {
   id: string
   category: string
   description: string
   amount: string
+  netAmount: string | null
+  vatAmount: string | null
   date: string
   vendor: string | null
   paymentMethod: string | null
@@ -31,7 +34,9 @@ export function ExpensesTable({ initialExpenses }: { initialExpenses: Expense[] 
           <TableRow>
             <TableHead>Category</TableHead>
             <TableHead>Description</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>Total Amount</TableHead>
+            <TableHead>Net Amount</TableHead>
+            <TableHead>VAT</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Vendor</TableHead>
             <TableHead>Payment Method</TableHead>
@@ -43,7 +48,9 @@ export function ExpensesTable({ initialExpenses }: { initialExpenses: Expense[] 
               <TableCell className="font-medium">{expense.category}</TableCell>
               <TableCell>{expense.description}</TableCell>
               <TableCell>${Number.parseFloat(expense.amount).toFixed(2)}</TableCell>
-              <TableCell>{expense.date}</TableCell>
+              <TableCell>{expense.netAmount ? `$${Number.parseFloat(expense.netAmount).toFixed(2)}` : "-"}</TableCell>
+              <TableCell>{expense.vatAmount ? `$${Number.parseFloat(expense.vatAmount).toFixed(2)}` : "-"}</TableCell>
+              <TableCell>{expense.date ? formatDate(expense.date, "SHORT") : "-"}</TableCell>
               <TableCell>{expense.vendor || "-"}</TableCell>
               <TableCell>{expense.paymentMethod || "-"}</TableCell>
               <TableCell>

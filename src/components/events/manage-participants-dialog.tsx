@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useOptimistic, useEffect, useRef } from "react"
+import { useState, useTransition, useOptimistic } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -39,7 +39,6 @@ interface ManageParticipantsDialogProps {
 export function ManageParticipantsDialog({ event, allStudents, open, onOpenChange, onEventUpdated }: ManageParticipantsDialogProps) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
-  const previousEventIdRef = useRef<string | null>(null)
 
   const [optimisticParticipants, addOptimisticParticipant] = useOptimistic(
     event?.participants || [],
@@ -73,20 +72,6 @@ export function ManageParticipantsDialog({ event, allStudents, open, onOpenChang
       return state
     }
   )
-
-  // Reset optimistic state when dialog opens with a new event
-  useEffect(() => {
-    if (!open || !event) return
-
-    // Only reset if event ID changed (dialog reopened with different event)
-    if (previousEventIdRef.current !== event.id) {
-      previousEventIdRef.current = event.id
-      addOptimisticParticipant({
-        type: "sync",
-        participants: event.participants || [],
-      })
-    }
-  }, [event, open, addOptimisticParticipant])
 
   if (!event) return null
 

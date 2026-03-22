@@ -21,6 +21,7 @@ import {
 import { MoreHorizontal, Eye, Edit, Trash } from "lucide-react";
 import { deleteStaff } from "@/app/actions/staff";
 import { useOptimistic, useTransition } from "react";
+import { formatDate } from "@/lib/date";
 
 type Staff = {
   id: string;
@@ -102,7 +103,7 @@ export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
                   <span className="text-muted-foreground text-sm">-</span>
                 )}
               </TableCell>
-              <TableCell>{staff.hireDate}</TableCell>
+              <TableCell>{staff.hireDate ? formatDate(staff.hireDate, "SHORT") : "-"}</TableCell>
               <TableCell>
                 <Badge
                   variant="secondary"

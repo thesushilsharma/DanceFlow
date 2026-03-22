@@ -16,6 +16,7 @@ import { deleteEvent, getEventDetails, getStudentsForEvent } from "@/app/actions
 import { EventDetailsDialog } from "./event-details-dialog"
 import { ManageParticipantsDialog } from "./manage-participants-dialog"
 import { EditEventDialog } from "./edit-event-dialog"
+import { formatDate } from "@/lib/date"
 
 interface Event {
   id: string
@@ -166,7 +167,7 @@ export function EventsGrid({ initialEvents }: { initialEvents: Event[] }) {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>{new Date(event.date).toLocaleDateString()}</span>
+                  <span>{event.date ? formatDate(event.date, "SHORT") : "-"}</span>
                 </div>
                 {event.location && (
                   <div className="flex items-center gap-2">

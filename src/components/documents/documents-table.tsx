@@ -15,6 +15,7 @@ import { MoreHorizontal, Download, Eye, Trash } from "lucide-react"
 import { FileText } from "lucide-react"
 import { deleteDocument } from "@/app/actions/documents"
 import { useOptimistic, useTransition } from "react"
+import { formatDate } from "@/lib/date"
 
 interface Document {
   id: string
@@ -90,7 +91,7 @@ export function DocumentsTable({ initialDocuments }: { initialDocuments: Documen
               </TableCell>
               <TableCell>{doc.studentId || "General"}</TableCell>
               <TableCell>{doc.uploadedBy || "Unknown"}</TableCell>
-              <TableCell>{new Date(doc.uploadedAt).toLocaleDateString()}</TableCell>
+              <TableCell>{doc.uploadedAt ? formatDate(doc.uploadedAt, "SHORT") : "-"}</TableCell>
               <TableCell className="text-muted-foreground">{formatFileSize(doc.fileSize)}</TableCell>
               <TableCell>
                 <DropdownMenu>

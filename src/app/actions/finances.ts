@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
 import { payments, expenses, students } from "@/drizzle/schema"
 import { eq, sql, gte } from "drizzle-orm"
+import { calculateVat } from "@/lib/vat"
 
 export async function getPayments() {
   try {
@@ -11,6 +12,8 @@ export async function getPayments() {
       .select({
         id: payments.id,
         amount: payments.amount,
+        netAmount: payments.netAmount,
+        vatAmount: payments.vatAmount,
         paymentDate: payments.paymentDate,
         status: payments.status,
         paymentMethod: payments.paymentMethod,
@@ -29,6 +32,8 @@ export async function getPayments() {
       studentFirstName: payment.studentFirstName,
       studentLastName: payment.studentLastName,
       amount: payment.amount,
+      netAmount: payment.netAmount,
+      vatAmount: payment.vatAmount,
       paidDate: payment.paymentDate ? String(payment.paymentDate) : null,
       method: payment.paymentMethod,
       status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
@@ -48,6 +53,8 @@ export async function getExpenses() {
       category: expense.category,
       description: expense.description,
       amount: expense.amount,
+      netAmount: expense.netAmount,
+      vatAmount: expense.vatAmount,
       date: String(expense.expenseDate),
       vendor: expense.vendor,
       paymentMethod: expense.paymentMethod,
@@ -133,9 +140,19 @@ export async function createPayment(
       return { success: false, error: "Please fill in all required fields" }
     }
 
+    const numericAmount = parseFloat(amount)
+    if (isNaN(numericAmount)) {
+      return { success: false, error: "Invalid amount" }
+    }
+
+    // Assume the entered amount is VAT inclusive (5% VAT rate default)
+    const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+
     await db.insert(payments).values({
       studentId,
-      amount,
+      amount: numericAmount.toString(),
+      netAmount: netAmount.toString(),
+      vatAmount: vatAmount.toString(),
       paymentDate,
       paymentMethod: paymentMethod || undefined,
       paymentType: paymentType || undefined,
@@ -175,10 +192,20 @@ export async function createExpense(
       return { success: false, error: "Please fill in all required fields" }
     }
 
+    const numericAmount = parseFloat(amount)
+    if (isNaN(numericAmount)) {
+      return { success: false, error: "Invalid amount" }
+    }
+
+    // Assume the entered amount is VAT inclusive (5% VAT rate default)
+    const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+
     await db.insert(expenses).values({
       category,
       description,
-      amount,
+      amount: numericAmount.toString(),
+      netAmount: netAmount.toString(),
+      vatAmount: vatAmount.toString(),
       expenseDate: date,
       vendor: vendor || undefined,
       paymentMethod: paymentMethod || undefined,

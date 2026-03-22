@@ -120,6 +120,8 @@ export const payments = pgTable("payments", {
     .references(() => students.id)
     .notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
+  vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }),
   paymentDate: date("payment_date").notNull(),
   paymentMethod: text("payment_method"),
   paymentType: text("payment_type"),
@@ -135,6 +137,8 @@ export const expenses = pgTable("expenses", {
   category: text("category").notNull(),
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
+  vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }),
   expenseDate: date("expense_date").notNull(),
   vendor: text("vendor"),
   paymentMethod: text("payment_method"),

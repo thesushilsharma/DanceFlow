@@ -3,12 +3,15 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useOptimistic } from "react"
+import { formatDate } from "@/lib/date"
 
 interface Payment {
   id: string
   studentFirstName: string | null
   studentLastName: string | null
   amount: string
+  netAmount: string | null
+  vatAmount: string | null
   paidDate: string | null
   method: string | null
   status: "paid" | "pending" | "overdue" | "cancelled"
@@ -31,7 +34,9 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
         <TableHeader>
           <TableRow>
             <TableHead>Student</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>Total Amount</TableHead>
+            <TableHead>Net Amount</TableHead>
+            <TableHead>VAT</TableHead>
             <TableHead>Paid Date</TableHead>
             <TableHead>Method</TableHead>
             <TableHead>Status</TableHead>
@@ -46,7 +51,9 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
                   : "Unknown Student"}
               </TableCell>
               <TableCell>${Number.parseFloat(payment.amount).toFixed(2)}</TableCell>
-              <TableCell>{payment.paidDate || "-"}</TableCell>
+              <TableCell>{payment.netAmount ? `$${Number.parseFloat(payment.netAmount).toFixed(2)}` : "-"}</TableCell>
+              <TableCell>{payment.vatAmount ? `$${Number.parseFloat(payment.vatAmount).toFixed(2)}` : "-"}</TableCell>
+              <TableCell>{payment.paidDate ? formatDate(payment.paidDate, "SHORT") : "-"}</TableCell>
               <TableCell>{payment.method || "-"}</TableCell>
               <TableCell>
                 <Badge variant="secondary" className={statusColors[payment.status]}>
