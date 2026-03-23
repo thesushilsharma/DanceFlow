@@ -1,6 +1,6 @@
 "use client"
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import React, { useOptimistic, useTransition, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,11 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Download, Eye, Trash } from "lucide-react"
-import { FileText } from "lucide-react"
+import { MoreHorizontal, Download, Eye, Trash, ArrowUpDown, FileText } from "lucide-react"
 import { deleteDocument } from "@/app/actions/documents"
-import { useOptimistic, useTransition } from "react"
 import { formatDate } from "@/lib/date"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
 
 interface Document {
   id: string
@@ -27,6 +27,9 @@ interface Document {
   uploadedBy: string | null
   uploadedAt: Date
   studentId: string | null
+  studentFirstName?: string | null
+  studentLastName?: string | null
+  studentEmail?: string | null
 }
 
 const typeColors = {
@@ -38,91 +41,143 @@ const typeColors = {
   Other: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
 }
 
+const formatFileSize = (bytes: number | null) => {
+  if (!bytes) return "N/A"
+  return `${(bytes / 1024).toFixed(0)} KB`
+}
+
+const getTypeLabel = (type: string) => {
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
 export function DocumentsTable({ initialDocuments }: { initialDocuments: Document[] }) {
   const [isPending, startTransition] = useTransition()
   const [optimisticDocuments, setOptimisticDocuments] = useOptimistic(initialDocuments)
 
   const handleDelete = (docId: string) => {
     startTransition(async () => {
-      setOptimisticDocuments(optimisticDocuments.filter((d) => d.id !== docId))
+      setOptimisticDocuments((docs) => docs.filter((d) => d.id !== docId))
       await deleteDocument(docId)
     })
   }
 
-  const formatFileSize = (bytes: number | null) => {
-    if (!bytes) return "N/A"
-    return `${(bytes / 1024).toFixed(0)} KB`
-  }
-
-  const getTypeLabel = (type: string) => {
-    return type.charAt(0).toUpperCase() + type.slice(1)
-  }
+  const columns = useMemo<ColumnDef<Document>[]>(
+    () => [
+      {
+        accessorKey: "title",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4 text-left font-medium"
+            >
+              Document
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{row.original.title}</span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "documentType",
+        header: "Type",
+        cell: ({ row }) => (
+          <Badge
+            variant="secondary"
+            className={typeColors[getTypeLabel(row.original.documentType) as keyof typeof typeColors] || typeColors.Other}
+          >
+            {getTypeLabel(row.original.documentType)}
+          </Badge>
+        ),
+      },
+      {
+        id: "relatedTo",
+        accessorFn: (row) => row.studentFirstName && row.studentLastName ? `${row.studentFirstName} ${row.studentLastName}` : (row.studentId || "General"),
+        header: "Related To",
+        cell: ({ row }) => {
+          const doc = row.original
+          if (doc.studentFirstName && doc.studentLastName) {
+            return (
+              <div className="flex flex-col">
+                <span className="font-medium">{doc.studentFirstName} {doc.studentLastName}</span>
+                {doc.studentEmail && <span className="text-xs text-muted-foreground">{doc.studentEmail}</span>}
+              </div>
+            )
+          }
+          return <span className="text-muted-foreground">{doc.studentId || "General"}</span>
+        },
+      },
+      {
+        accessorKey: "uploadedBy",
+        header: "Uploaded By",
+        cell: ({ row }) => <span className="text-muted-foreground">{row.original.uploadedBy || "Unknown"}</span>,
+      },
+      {
+        accessorKey: "uploadedAt",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4"
+            >
+              Upload Date
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => (row.original.uploadedAt ? formatDate(row.original.uploadedAt, "SHORT") : "-"),
+      },
+      {
+        accessorKey: "fileSize",
+        header: "Size",
+        cell: ({ row }) => <span className="text-muted-foreground">{formatFileSize(row.original.fileSize)}</span>,
+      },
+      {
+        id: "actions",
+        cell: ({ row }) => {
+          const doc = row.original
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={isPending}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc.id)}>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        },
+      },
+    ],
+    [isPending, setOptimisticDocuments] // Ensure we handle optimistic update properly
+  )
 
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Document</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Related To</TableHead>
-            <TableHead>Uploaded By</TableHead>
-            <TableHead>Upload Date</TableHead>
-            <TableHead>Size</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {optimisticDocuments.map((doc) => (
-            <TableRow key={doc.id} className={isPending ? "opacity-50" : ""}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{doc.title}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge
-                  variant="secondary"
-                  className={typeColors[getTypeLabel(doc.documentType) as keyof typeof typeColors]}
-                >
-                  {getTypeLabel(doc.documentType)}
-                </Badge>
-              </TableCell>
-              <TableCell>{doc.studentId || "General"}</TableCell>
-              <TableCell>{doc.uploadedBy || "Unknown"}</TableCell>
-              <TableCell>{doc.uploadedAt ? formatDate(doc.uploadedAt, "SHORT") : "-"}</TableCell>
-              <TableCell className="text-muted-foreground">{formatFileSize(doc.fileSize)}</TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={isPending}>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc.id)}>
-                      <Trash className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+      <DataTable columns={columns} data={optimisticDocuments} searchKey="title" />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useMemo, useTransition } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,11 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Edit, Trash } from "lucide-react"
+import { MoreHorizontal, Eye, Edit, Trash, ArrowUpDown } from "lucide-react"
 import { deleteStudent } from "@/app/actions/students"
-import { useTransition } from "react"
 import { toast } from "sonner"
 import { formatDate } from "@/lib/date"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
 
 type Student = {
   id: string
@@ -36,6 +37,17 @@ const statusColors = {
   graduated: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
 }
 
+const calculateAge = (dob: string) => {
+  const birthDate = new Date(dob)
+  const today = new Date()
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const monthDiff = today.getMonth() - birthDate.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--
+  }
+  return age
+}
+
 export function StudentTable({ students }: { students: Student[] }) {
   const [isPending, startTransition] = useTransition()
 
@@ -52,89 +64,98 @@ export function StudentTable({ students }: { students: Student[] }) {
     })
   }
 
-  const calculateAge = (dob: string) => {
-    const birthDate = new Date(dob)
-    const today = new Date()
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-    return age
-  }
+  const columns = useMemo<ColumnDef<Student>[]>(
+    () => [
+      {
+        id: "name",
+        accessorFn: (row) => `${row.firstName} ${row.lastName}`,
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4 text-left font-medium"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <span className="font-medium">{row.getValue("name")}</span>,
+      },
+      {
+        id: "age",
+        header: "Age",
+        cell: ({ row }) => calculateAge(row.original.dateOfBirth),
+      },
+      {
+        accessorKey: "level",
+        header: "Level",
+        cell: ({ row }) => row.original.level || "N/A",
+      },
+      {
+        accessorKey: "enrollmentDate",
+        header: "Enrollment Date",
+        cell: ({ row }) => (row.original.enrollmentDate ? formatDate(row.original.enrollmentDate, "SHORT") : "-"),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge variant="secondary" className={statusColors[row.original.status as keyof typeof statusColors]}>
+            {row.original.status}
+          </Badge>
+        ),
+      },
+      {
+        id: "contact",
+        header: "Contact",
+        cell: ({ row }) => (
+          <div className="text-sm">
+            <div>{row.original.phone || "N/A"}</div>
+            <div className="text-muted-foreground">{row.original.email || "N/A"}</div>
+          </div>
+        ),
+      },
+      {
+        id: "actions",
+        cell: ({ row }) => {
+          const student = row.original
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={isPending}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(student.id)}>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        },
+      },
+    ],
+    [isPending]
+  )
 
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Age</TableHead>
-            <TableHead>Level</TableHead>
-            <TableHead>Enrollment Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {students.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                No students found. Add your first student to get started.
-              </TableCell>
-            </TableRow>
-          ) : (
-            students.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell className="font-medium">
-                  {student.firstName} {student.lastName}
-                </TableCell>
-                <TableCell>{calculateAge(student.dateOfBirth)}</TableCell>
-                <TableCell>{student.level || "N/A"}</TableCell>
-                <TableCell>{student.enrollmentDate ? formatDate(student.enrollmentDate, "SHORT") : "-"}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className={statusColors[student.status as keyof typeof statusColors]}>
-                    {student.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    <div>{student.phone || "N/A"}</div>
-                    <div className="text-muted-foreground">{student.email || "N/A"}</div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={isPending}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(student.id)}>
-                        <Trash className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+      <DataTable columns={columns} data={students} searchKey="name" />
     </div>
   )
 }

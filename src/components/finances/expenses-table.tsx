@@ -1,9 +1,11 @@
 "use client"
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useOptimistic } from "react"
-import { Badge } from "../ui/badge"
+import { useOptimistic, useMemo } from "react"
 import { formatDate } from "@/lib/date"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
+import { Button } from "@/components/ui/button"
+import { ArrowUpDown } from "lucide-react"
 
 interface Expense {
   id: string
@@ -27,41 +29,66 @@ const statusColors = {
 export function ExpensesTable({ initialExpenses }: { initialExpenses: Expense[] }) {
   const [optimisticExpenses] = useOptimistic(initialExpenses)
 
+  const columns = useMemo<ColumnDef<Expense>[]>(
+    () => [
+      {
+        accessorKey: "category",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4 text-left font-medium"
+            >
+              Category
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <span className="font-medium">{row.original.category}</span>,
+      },
+      {
+        accessorKey: "description",
+        header: "Description",
+        cell: ({ row }) => row.original.description,
+      },
+      {
+        accessorKey: "amount",
+        header: "Total Amount",
+        cell: ({ row }) => `$${Number.parseFloat(row.original.amount).toFixed(2)}`,
+      },
+      {
+        accessorKey: "netAmount",
+        header: "Net Amount",
+        cell: ({ row }) => (row.original.netAmount ? `$${Number.parseFloat(row.original.netAmount).toFixed(2)}` : "-"),
+      },
+      {
+        accessorKey: "vatAmount",
+        header: "VAT",
+        cell: ({ row }) => (row.original.vatAmount ? `$${Number.parseFloat(row.original.vatAmount).toFixed(2)}` : "-"),
+      },
+      {
+        accessorKey: "date",
+        header: "Date",
+        cell: ({ row }) => (row.original.date ? formatDate(row.original.date, "SHORT") : "-"),
+      },
+      {
+        accessorKey: "vendor",
+        header: "Vendor",
+        cell: ({ row }) => row.original.vendor || "-",
+      },
+      {
+        accessorKey: "paymentMethod",
+        header: "Payment Method",
+        cell: ({ row }) => row.original.paymentMethod || "-",
+      },
+    ],
+    []
+  )
+
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Category</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Total Amount</TableHead>
-            <TableHead>Net Amount</TableHead>
-            <TableHead>VAT</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Vendor</TableHead>
-            <TableHead>Payment Method</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {optimisticExpenses.map((expense) => (
-            <TableRow key={expense.id}>
-              <TableCell className="font-medium">{expense.category}</TableCell>
-              <TableCell>{expense.description}</TableCell>
-              <TableCell>${Number.parseFloat(expense.amount).toFixed(2)}</TableCell>
-              <TableCell>{expense.netAmount ? `$${Number.parseFloat(expense.netAmount).toFixed(2)}` : "-"}</TableCell>
-              <TableCell>{expense.vatAmount ? `$${Number.parseFloat(expense.vatAmount).toFixed(2)}` : "-"}</TableCell>
-              <TableCell>{expense.date ? formatDate(expense.date, "SHORT") : "-"}</TableCell>
-              <TableCell>{expense.vendor || "-"}</TableCell>
-              <TableCell>{expense.paymentMethod || "-"}</TableCell>
-              <TableCell>
-                {/* <Badge variant="secondary" className={statusColors[expense.status as keyof typeof statusColors]}>
-                  {expense.status}
-                </Badge> */}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="border rounded-lg border-none shadow-none">
+      <DataTable columns={columns} data={optimisticExpenses} searchKey="category" />
     </div>
   )
 }

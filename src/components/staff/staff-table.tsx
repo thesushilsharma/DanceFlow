@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useOptimistic, useTransition, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,10 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Eye, Edit, Trash } from "lucide-react";
+import { MoreHorizontal, Eye, Edit, Trash, ArrowUpDown } from "lucide-react";
 import { deleteStaff } from "@/app/actions/staff";
-import { useOptimistic, useTransition } from "react";
 import { formatDate } from "@/lib/date";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 
 type Staff = {
   id: string;
@@ -47,106 +41,134 @@ const statusColors = {
   "on-leave": "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
 };
 
-export function StaffTable({ initialStaff }: { initialStaff: any[] }) {
+export function StaffTable({ initialStaff }: { initialStaff: Staff[] }) {
   const [isPending, startTransition] = useTransition();
   const [optimisticStaff, setOptimisticStaff] = useOptimistic(initialStaff);
 
   const handleDelete = (staffId: string) => {
     startTransition(async () => {
-      setOptimisticStaff(optimisticStaff.filter((s) => s.id !== staffId));
+      setOptimisticStaff((staffList) => staffList.filter((s) => s.id !== staffId));
       await deleteStaff(staffId);
     });
   };
 
+  const columns = useMemo<ColumnDef<Staff>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4 text-left font-medium"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      },
+      {
+        accessorKey: "role",
+        header: "Role",
+        cell: ({ row }) => (
+          <Badge
+            variant="secondary"
+            className={roleColors[row.original.role as keyof typeof roleColors]}
+          >
+            {row.original.role}
+          </Badge>
+        ),
+      },
+      {
+        id: "contact",
+        header: "Contact",
+        cell: ({ row }) => (
+          <div className="text-sm">
+            <div>{row.original.email}</div>
+            <div className="text-muted-foreground">{row.original.phone}</div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: "specializations",
+        header: "Specializations",
+        cell: ({ row }) => {
+          const sp = row.original.specializations;
+          return sp && sp.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {sp.map((spec: string, i: number) => (
+                <Badge key={i} variant="outline" className="text-xs">
+                  {spec}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          );
+        },
+      },
+      {
+        accessorKey: "hireDate",
+        header: "Hire Date",
+        cell: ({ row }) => (row.original.hireDate ? formatDate(row.original.hireDate, "SHORT") : "-"),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge
+            variant="secondary"
+            className={statusColors[row.original.status as keyof typeof statusColors]}
+          >
+            {row.original.status}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        cell: ({ row }) => {
+          const staff = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={isPending}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => handleDelete(staff.id)}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        },
+      },
+    ],
+    [isPending, setOptimisticStaff]
+  );
+
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Specializations</TableHead>
-            <TableHead>Hire Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {optimisticStaff.map((staff) => (
-            <TableRow key={staff.id} className={isPending ? "opacity-50" : ""}>
-              <TableCell className="font-medium">{staff.name}</TableCell>
-              <TableCell>
-                <Badge
-                  variant="secondary"
-                  className={roleColors[staff.role as keyof typeof roleColors]}
-                >
-                  {staff.role}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="text-sm">
-                  <div>{staff.email}</div>
-                  <div className="text-muted-foreground">{staff.phone}</div>
-                </div>
-              </TableCell>
-              <TableCell>
-                {staff.specializations && staff.specializations.length > 0 ? (
-                  <div className="flex flex-wrap gap-1">
-                    {staff.specializations.map((spec: string, i: number) => (
-                      <Badge key={i} variant="outline" className="text-xs">
-                        {spec}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground text-sm">-</span>
-                )}
-              </TableCell>
-              <TableCell>{staff.hireDate ? formatDate(staff.hireDate, "SHORT") : "-"}</TableCell>
-              <TableCell>
-                <Badge
-                  variant="secondary"
-                  className={
-                    statusColors[staff.status as keyof typeof statusColors]
-                  }
-                >
-                  {staff.status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={isPending}>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => handleDelete(staff.id)}
-                    >
-                      <Trash className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+      <DataTable columns={columns} data={optimisticStaff} searchKey="name" />
     </div>
   );
 }

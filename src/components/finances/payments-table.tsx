@@ -1,9 +1,12 @@
 "use client"
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useOptimistic, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
-import { useOptimistic } from "react"
 import { formatDate } from "@/lib/date"
+import { DataTable } from "@/components/ui/data-table"
+import { ColumnDef } from "@tanstack/react-table"
+import { Button } from "@/components/ui/button"
+import { ArrowUpDown } from "lucide-react"
 
 interface Payment {
   id: string
@@ -28,42 +31,69 @@ const statusColors = {
 export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] }) {
   const [optimisticPayments] = useOptimistic(initialPayments)
 
+  const columns = useMemo<ColumnDef<Payment>[]>(
+    () => [
+      {
+        id: "student",
+        accessorFn: (row) =>
+          row.studentFirstName && row.studentLastName
+            ? `${row.studentFirstName} ${row.studentLastName}`
+            : "Unknown Student",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4 text-left font-medium"
+            >
+              Student
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <span className="font-medium">{row.getValue("student")}</span>,
+      },
+      {
+        accessorKey: "amount",
+        header: "Total Amount",
+        cell: ({ row }) => `$${Number.parseFloat(row.original.amount).toFixed(2)}`,
+      },
+      {
+        accessorKey: "netAmount",
+        header: "Net Amount",
+        cell: ({ row }) => (row.original.netAmount ? `$${Number.parseFloat(row.original.netAmount).toFixed(2)}` : "-"),
+      },
+      {
+        accessorKey: "vatAmount",
+        header: "VAT",
+        cell: ({ row }) => (row.original.vatAmount ? `$${Number.parseFloat(row.original.vatAmount).toFixed(2)}` : "-"),
+      },
+      {
+        accessorKey: "paidDate",
+        header: "Paid Date",
+        cell: ({ row }) => (row.original.paidDate ? formatDate(row.original.paidDate, "SHORT") : "-"),
+      },
+      {
+        accessorKey: "method",
+        header: "Method",
+        cell: ({ row }) => row.original.method || "-",
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge variant="secondary" className={statusColors[row.original.status]}>
+            {row.original.status}
+          </Badge>
+        ),
+      },
+    ],
+    []
+  )
+
   return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Student</TableHead>
-            <TableHead>Total Amount</TableHead>
-            <TableHead>Net Amount</TableHead>
-            <TableHead>VAT</TableHead>
-            <TableHead>Paid Date</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {optimisticPayments.map((payment) => (
-            <TableRow key={payment.id}>
-              <TableCell className="font-medium">
-                {payment.studentFirstName && payment.studentLastName
-                  ? `${payment.studentFirstName} ${payment.studentLastName}`
-                  : "Unknown Student"}
-              </TableCell>
-              <TableCell>${Number.parseFloat(payment.amount).toFixed(2)}</TableCell>
-              <TableCell>{payment.netAmount ? `$${Number.parseFloat(payment.netAmount).toFixed(2)}` : "-"}</TableCell>
-              <TableCell>{payment.vatAmount ? `$${Number.parseFloat(payment.vatAmount).toFixed(2)}` : "-"}</TableCell>
-              <TableCell>{payment.paidDate ? formatDate(payment.paidDate, "SHORT") : "-"}</TableCell>
-              <TableCell>{payment.method || "-"}</TableCell>
-              <TableCell>
-                <Badge variant="secondary" className={statusColors[payment.status]}>
-                  {payment.status}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="border rounded-lg border-none shadow-none">
+      <DataTable columns={columns} data={optimisticPayments} searchKey="student" />
     </div>
   )
 }

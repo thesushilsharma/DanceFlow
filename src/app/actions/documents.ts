@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/drizzle/db"
-import { documents } from "@/drizzle/schema"
+import { documents, students } from "@/drizzle/schema"
 import { revalidatePath } from "next/cache"
 import { eq, desc } from "drizzle-orm"
 import fs from "fs/promises"
@@ -9,7 +9,25 @@ import path from "path"
 
 export async function getDocuments() {
   try {
-    const allDocuments = await db.select().from(documents).orderBy(desc(documents.uploadedAt))
+    const allDocuments = await db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        documentType: documents.documentType,
+        fileName: documents.fileName,
+        fileUrl: documents.fileUrl,
+        fileSize: documents.fileSize,
+        uploadedBy: documents.uploadedBy,
+        uploadedAt: documents.uploadedAt,
+        studentId: documents.studentId,
+        studentFirstName: students.firstName,
+        studentLastName: students.lastName,
+        studentEmail: students.email,
+      })
+      .from(documents)
+      .leftJoin(students, eq(documents.studentId, students.id))
+      .orderBy(desc(documents.uploadedAt))
+
     return allDocuments.map((doc) => ({
       id: doc.id,
       title: doc.title,
@@ -20,6 +38,9 @@ export async function getDocuments() {
       uploadedBy: doc.uploadedBy,
       uploadedAt: doc.uploadedAt,
       studentId: doc.studentId,
+      studentFirstName: doc.studentFirstName,
+      studentLastName: doc.studentLastName,
+      studentEmail: doc.studentEmail,
     }))
   } catch (error) {
     console.error("Failed to fetch documents:", error)

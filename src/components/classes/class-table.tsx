@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useTransition, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,10 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Users, Edit, Trash } from "lucide-react";
+import { MoreHorizontal, Users, Edit, Trash, ArrowUpDown } from "lucide-react";
 import { deleteClass } from "@/app/actions/classes";
-import { useTransition } from "react";
 import { toast } from "sonner";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 
 type ClassWithDetails = {
   id: string;
@@ -63,125 +57,131 @@ export function ClassTable({ classes }: { classes: ClassWithDetails[] }) {
     });
   };
 
-  return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Class Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Level</TableHead>
-            <TableHead>Schedule</TableHead>
-            <TableHead>Instructor</TableHead>
-            <TableHead>Enrollment</TableHead>
-            <TableHead>Tuition</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {classes.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={9}
-                className="text-center text-muted-foreground py-8"
-              >
-                No classes found. Add your first class to get started.
-              </TableCell>
-            </TableRow>
-          ) : (
-            classes.map((classItem) => {
-              const enrollmentPercentage =
-                (classItem.enrollmentCount / classItem.capacity) * 100;
-              const isNearCapacity = enrollmentPercentage >= 80;
+  const columns = useMemo<ColumnDef<ClassWithDetails>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: ({ column }) => {
+          return (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="-ml-4 text-left font-medium"
+            >
+              Class Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          )
+        },
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      },
+      {
+        accessorKey: "type",
+        header: "Type",
+      },
+      {
+        accessorKey: "level",
+        header: "Level",
+        cell: ({ row }) => row.original.level || "N/A",
+      },
+      {
+        id: "schedule",
+        header: "Schedule",
+        cell: ({ row }) => (
+          <div className="text-sm">
+            <div className="capitalize">{row.original.dayOfWeek}</div>
+            <div className="text-muted-foreground">
+              {row.original.startTime} - {row.original.endTime}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "instructor",
+        header: "Instructor",
+        cell: ({ row }) =>
+          row.original.instructorFirstName && row.original.instructorLastName
+            ? `${row.original.instructorFirstName} ${row.original.instructorLastName}`
+            : "Not assigned",
+      },
+      {
+        id: "enrollment",
+        header: "Enrollment",
+        cell: ({ row }) => {
+          const classItem = row.original;
+          const enrollmentPercentage = (classItem.enrollmentCount / classItem.capacity) * 100;
+          const isNearCapacity = enrollmentPercentage >= 80;
+          return (
+            <div className="flex items-center gap-2">
+              <span className={isNearCapacity ? "text-yellow-600 dark:text-yellow-400" : ""}>
+                {classItem.enrollmentCount}/{classItem.capacity}
+              </span>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "tuition",
+        header: "Tuition",
+        cell: ({ row }) => `$${row.original.tuition ?? "0.00"}`,
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge
+            variant="secondary"
+            className={statusColors[row.original.status as keyof typeof statusColors]}
+          >
+            {row.original.status}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        cell: ({ row }) => {
+          const classItem = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" disabled={isPending}>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Users className="h-4 w-4 mr-2" />
+                  Manage Enrollments
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => handleDelete(classItem.id)}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    [isPending]
+  );
 
-              return (
-                <TableRow key={classItem.id}>
-                  <TableCell className="font-medium">
-                    {classItem.name}
-                  </TableCell>
-                  <TableCell>{classItem.type}</TableCell>
-                  <TableCell>{classItem.level || "N/A"}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="capitalize">{classItem.dayOfWeek}</div>
-                      <div className="text-muted-foreground">
-                        {classItem.startTime} - {classItem.endTime}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {classItem.instructorFirstName &&
-                    classItem.instructorLastName
-                      ? `${classItem.instructorFirstName} ${classItem.instructorLastName}`
-                      : "Not assigned"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={
-                          isNearCapacity
-                            ? "text-yellow-600 dark:text-yellow-400"
-                            : ""
-                        }
-                      >
-                        {classItem.enrollmentCount}/{classItem.capacity}
-                      </span>
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </TableCell>
-                  <TableCell>${classItem.tuition ?? "0.00"}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={
-                        statusColors[
-                          classItem.status as keyof typeof statusColors
-                        ]
-                      }
-                    >
-                      {classItem.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={isPending}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Users className="h-4 w-4 mr-2" />
-                          Manage Enrollments
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDelete(classItem.id)}
-                        >
-                          <Trash className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+  return (
+    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+      <div className="border rounded-lg border-none shadow-none">
+        <DataTable columns={columns} data={classes} searchKey="name" />
+      </div>
     </div>
   );
 }
