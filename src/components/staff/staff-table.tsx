@@ -21,9 +21,9 @@ type Staff = {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   role: string;
-  specializations: string[];
+  specializations: string[] | null;
   hireDate: string;
   status: string;
 };
