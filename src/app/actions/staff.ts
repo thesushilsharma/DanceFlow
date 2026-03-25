@@ -66,3 +66,31 @@ export async function deleteStaff(id: string) {
     return { success: false, error: "Failed to delete staff member" }
   }
 }
+
+export async function updateStaff(id: string, formData: FormData) {
+  try {
+    const firstName = formData.get("firstName") as string
+    const lastName = formData.get("lastName") as string
+    const email = formData.get("email") as string
+    const phone = formData.get("phone") as string
+    const role = formData.get("role") as string
+    const specialization = formData.get("specialization") as string
+    const status = formData.get("status") as string
+
+    const specializations = specialization
+      ? specialization.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+      : undefined
+
+    await db
+      .update(staff)
+      .set({ firstName, lastName, email, phone, role, specializations, status })
+      .where(eq(staff.id, id))
+
+    revalidatePath("/dashboard/staff")
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating staff:", error)
+    return { success: false, error: "Failed to update staff member" }
+  }
+}
+

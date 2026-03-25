@@ -82,3 +82,26 @@ export async function deleteStudent(id: string) {
     return { success: false, error: "Failed to delete student" }
   }
 }
+
+export async function updateStudent(id: string, formData: FormData) {
+  try {
+    const firstName = formData.get("firstName") as string
+    const lastName = formData.get("lastName") as string
+    const dateOfBirth = formData.get("dateOfBirth") as string
+    const email = formData.get("email") as string
+    const phone = formData.get("phone") as string
+    const level = formData.get("level") as string
+    const status = formData.get("status") as string
+
+    await db
+      .update(students)
+      .set({ firstName, lastName, dateOfBirth, email, phone, level, status })
+      .where(eq(students.id, id))
+
+    revalidatePath("/dashboard/students")
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating student:", error)
+    return { success: false, error: "Failed to update student" }
+  }
+}
