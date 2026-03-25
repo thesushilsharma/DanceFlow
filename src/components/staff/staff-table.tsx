@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition, useMemo } from "react";
+import { useOptimistic, useTransition, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import { deleteStaff } from "@/app/actions/staff";
 import { formatDate } from "@/lib/date";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { ViewStaffDialog } from "@/components/staff/view-staff-dialog";
+import { EditStaffDialog } from "@/components/staff/edit-staff-dialog";
 
 type Staff = {
   id: string;
@@ -44,6 +46,8 @@ const statusColors = {
 export function StaffTable({ initialStaff }: { initialStaff: Staff[] }) {
   const [isPending, startTransition] = useTransition();
   const [optimisticStaff, setOptimisticStaff] = useOptimistic(initialStaff);
+  const [viewStaff, setViewStaff] = useState<Staff | null>(null);
+  const [editStaff, setEditStaff] = useState<Staff | null>(null);
 
   const handleDelete = (staffId: string) => {
     startTransition(async () => {
@@ -141,11 +145,11 @@ export function StaffTable({ initialStaff }: { initialStaff: Staff[] }) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewStaff(staff)}>
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setEditStaff(staff)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -167,8 +171,20 @@ export function StaffTable({ initialStaff }: { initialStaff: Staff[] }) {
   );
 
   return (
-    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
-      <DataTable columns={columns} data={optimisticStaff} searchKey="name" />
-    </div>
+    <>
+      <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+        <DataTable columns={columns} data={optimisticStaff} searchKey="name" />
+      </div>
+      <ViewStaffDialog
+        staff={viewStaff}
+        open={!!viewStaff}
+        onOpenChange={(open) => !open && setViewStaff(null)}
+      />
+      <EditStaffDialog
+        staff={editStaff}
+        open={!!editStaff}
+        onOpenChange={(open) => !open && setEditStaff(null)}
+      />
+    </>
   );
 }

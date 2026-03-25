@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useTransition } from "react"
+import { useMemo, useTransition, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +17,8 @@ import { toast } from "sonner"
 import { formatDate } from "@/lib/date"
 import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
+import { ViewStudentDialog } from "@/components/students/view-student-dialog"
+import { EditStudentDialog } from "@/components/students/edit-student-dialog"
 
 type Student = {
   id: string
@@ -50,6 +52,8 @@ const calculateAge = (dob: string) => {
 
 export function StudentTable({ students }: { students: Student[] }) {
   const [isPending, startTransition] = useTransition()
+  const [viewStudent, setViewStudent] = useState<Student | null>(null)
+  const [editStudent, setEditStudent] = useState<Student | null>(null)
 
   const handleDelete = (id: string) => {
     if (!confirm("Are you sure you want to delete this student?")) return
@@ -131,11 +135,11 @@ export function StudentTable({ students }: { students: Student[] }) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewStudent(student)}>
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setEditStudent(student)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -154,8 +158,20 @@ export function StudentTable({ students }: { students: Student[] }) {
   )
 
   return (
-    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
-      <DataTable columns={columns} data={students} searchKey="name" />
-    </div>
+    <>
+      <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+        <DataTable columns={columns} data={students} searchKey="name" />
+      </div>
+      <ViewStudentDialog
+        student={viewStudent}
+        open={!!viewStudent}
+        onOpenChange={(open) => !open && setViewStudent(null)}
+      />
+      <EditStudentDialog
+        student={editStudent}
+        open={!!editStudent}
+        onOpenChange={(open) => !open && setEditStudent(null)}
+      />
+    </>
   )
 }

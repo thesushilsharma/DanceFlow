@@ -4,6 +4,7 @@ import { uploadDocument } from "@/app/actions/documents"
 import { getStudents } from "@/app/actions/students"
 import { useActionState, useEffect, useState } from "react"
 import { toast } from "sonner"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,7 +25,7 @@ const initialState = {
   message: "",
 }
 
-export function UploadDocumentDialog({ children }: { children: React.ReactNode }) {
+export function UploadDocumentDialog() {
   const [open, setOpen] = useState(false)
   const [state, formAction, isPending] = useActionState(uploadDocument, initialState)
   const [students, setStudents] = useState<{ id: string; firstName: string; lastName: string }[]>([])
@@ -44,7 +45,12 @@ export function UploadDocumentDialog({ children }: { children: React.ReactNode }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="h-4 w-4 mr-2" />
+          Upload Document
+        </Button>
+      </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
