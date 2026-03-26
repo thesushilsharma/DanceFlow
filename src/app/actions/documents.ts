@@ -101,3 +101,28 @@ export async function deleteDocument(documentId: string) {
     return { success: false, error: "Failed to delete document" }
   }
 }
+
+export async function getStudentDocuments(studentId: string) {
+  try {
+    const studentDocs = await db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        documentType: documents.documentType,
+        fileName: documents.fileName,
+        fileUrl: documents.fileUrl,
+        uploadedAt: documents.uploadedAt,
+      })
+      .from(documents)
+      .where(eq(documents.studentId, studentId))
+      .orderBy(desc(documents.uploadedAt))
+    
+    return studentDocs.map((doc) => ({
+      ...doc,
+      uploadedAt: doc.uploadedAt.toISOString(),
+    }))
+  } catch (error) {
+    console.error("Failed to fetch student documents:", error)
+    return []
+  }
+}
