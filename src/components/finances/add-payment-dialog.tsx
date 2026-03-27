@@ -17,10 +17,18 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getStudents } from "@/app/actions/students"
+import { getClasses } from "@/app/actions/classes"
 import { createPayment } from "@/app/actions/finances"
 import { toast } from "sonner"
 import { Search, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+type ClassOption = {
+  id: string
+  name: string
+  type: string
+  dayOfWeek: string
+}
 
 export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -30,6 +38,8 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; firstName: string; lastName: string } | null>(null)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [availableClasses, setAvailableClasses] = useState<ClassOption[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string>("")
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
 
@@ -58,15 +68,25 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     }
   }, [searchQuery])
 
-  // Load initial students when dialog opens
+  // Load initial students and classes when dialog opens
   useEffect(() => {
     if (open && !hasLoadedInitialRef.current && !searchQuery) {
       hasLoadedInitialRef.current = true
       getStudents().then((results) => {
-        setStudents(results.slice(0, 10)) // Show first 10 initially
+        setStudents(results.slice(0, 10))
+      })
+      getClasses().then((results) => {
+        setAvailableClasses(
+          results.map((c) => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            dayOfWeek: c.dayOfWeek,
+          }))
+        )
       })
     }
-    
+
     if (!open) {
       hasLoadedInitialRef.current = false
     }
@@ -79,6 +99,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
       setSelectedStudent(null)
       setStudents([])
       setIsSearchOpen(false)
+      setSelectedClassId("")
     }
   }, [open])
 
@@ -87,7 +108,6 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     if (state?.success && open) {
       toast.success("Payment added successfully")
       setOpen(false)
-      // Reset form
       setSelectedStudent(null)
     } else if (state?.error && open) {
       toast.error(state.error)
@@ -97,13 +117,14 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Payment</DialogTitle>
           <DialogDescription>Record a new payment from a student.</DialogDescription>
         </DialogHeader>
         <form action={formAction}>
           <div className="grid gap-4 py-4">
+            {/* Student selector */}
             <div className="space-y-2">
               <Label htmlFor="student">Student *</Label>
               <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
@@ -189,6 +210,37 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
+            {/* Class selector */}
+            <div className="space-y-2">
+              <Label htmlFor="classId">Class (Payment For)</Label>
+              <Select
+                name="classId"
+                value={selectedClassId}
+                onValueChange={setSelectedClassId}
+                disabled={isPending}
+              >
+                <SelectTrigger id="classId">
+                  <SelectValue placeholder="Select class (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {availableClasses.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({cls.dayOfWeek})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Pass empty string if "none" selected so the action receives null */}
+              {selectedClassId && selectedClassId !== "none" && (
+                <input type="hidden" name="classId" value={selectedClassId} />
+              )}
+            </div>
+
+            {/* Amount & Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount *</Label>
@@ -215,6 +267,29 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
+            {/* Receipt Number & Reference Number */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="receiptNumber">Receipt Number</Label>
+                <Input
+                  id="receiptNumber"
+                  name="receiptNumber"
+                  placeholder="RCP-0001"
+                  disabled={isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="referenceNumber">Reference Number</Label>
+                <Input
+                  id="referenceNumber"
+                  name="referenceNumber"
+                  placeholder="Optional"
+                  disabled={isPending}
+                />
+              </div>
+            </div>
+
+            {/* Payment Method & Payment Type */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">Payment Method</Label>
@@ -240,6 +315,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tuition">Tuition</SelectItem>
+                    <SelectItem value="renewal">Renewal (Existing)</SelectItem>
                     <SelectItem value="registration">Registration</SelectItem>
                     <SelectItem value="costume">Costume</SelectItem>
                     <SelectItem value="competition">Competition</SelectItem>
@@ -249,16 +325,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="referenceNumber">Reference Number</Label>
-              <Input
-                id="referenceNumber"
-                name="referenceNumber"
-                placeholder="Optional"
-                disabled={isPending}
-              />
-            </div>
-
+            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Input

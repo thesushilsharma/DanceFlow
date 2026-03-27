@@ -119,12 +119,14 @@ export const payments = pgTable("payments", {
   studentId: uuid("student_id")
     .references(() => students.id)
     .notNull(),
+  classId: uuid("class_id").references(() => classes.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
   vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }),
   paymentDate: date("payment_date").notNull(),
   paymentMethod: text("payment_method"),
   paymentType: text("payment_type"),
+  receiptNumber: text("receipt_number"),
   referenceNumber: text("reference_number"),
   status: text("status").default("completed").notNull(),
   notes: text("notes"),

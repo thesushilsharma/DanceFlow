@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { payments, expenses, students } from "@/drizzle/schema"
+import { payments, expenses, students, classes } from "@/drizzle/schema"
 import { eq, sql, gte } from "drizzle-orm"
 import { calculateVat } from "@/lib/vat"
 
@@ -18,14 +18,18 @@ export async function getPayments() {
         status: payments.status,
         paymentMethod: payments.paymentMethod,
         paymentType: payments.paymentType,
+        receiptNumber: payments.receiptNumber,
         referenceNumber: payments.referenceNumber,
         notes: payments.notes,
         studentId: payments.studentId,
+        classId: payments.classId,
         studentFirstName: students.firstName,
         studentLastName: students.lastName,
+        className: classes.name,
       })
       .from(payments)
       .leftJoin(students, eq(payments.studentId, students.id))
+      .leftJoin(classes, eq(payments.classId, classes.id))
 
     return paymentsWithStudents.map((payment) => ({
       id: payment.id,
@@ -36,6 +40,10 @@ export async function getPayments() {
       vatAmount: payment.vatAmount,
       paidDate: payment.paymentDate ? String(payment.paymentDate) : null,
       method: payment.paymentMethod,
+      paymentType: payment.paymentType,
+      receiptNumber: payment.receiptNumber,
+      referenceNumber: payment.referenceNumber,
+      className: payment.className,
       status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
       notes: payment.notes,
     }))
@@ -124,10 +132,12 @@ export async function createPayment(
 ): Promise<PaymentState> {
   try {
     const studentId = formData.get("studentId") as string
+    const classId = formData.get("classId") as string | null
     const amount = formData.get("amount") as string
     const paymentDate = formData.get("paymentDate") as string
     const paymentMethod = formData.get("paymentMethod") as string | null
     const paymentType = formData.get("paymentType") as string | null
+    const receiptNumber = formData.get("receiptNumber") as string | null
     const referenceNumber = formData.get("referenceNumber") as string | null
     const status = (formData.get("status") as string) || "completed"
     const notes = formData.get("notes") as string | null
@@ -150,12 +160,14 @@ export async function createPayment(
 
     await db.insert(payments).values({
       studentId,
+      classId: classId && classId.trim() ? classId.trim() : null,
       amount: numericAmount.toString(),
       netAmount: netAmount.toString(),
       vatAmount: vatAmount.toString(),
       paymentDate,
       paymentMethod: paymentMethod || undefined,
       paymentType: paymentType || undefined,
+      receiptNumber: receiptNumber || undefined,
       referenceNumber: referenceNumber || undefined,
       status,
       notes: notes || undefined,
@@ -219,4 +231,3 @@ export async function createExpense(
     return { success: false, error: "Failed to create expense" }
   }
 }
-
