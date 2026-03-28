@@ -2,6 +2,7 @@
 
 import { useOptimistic, useMemo } from "react"
 import { formatDate } from "@/lib/date"
+import { calculateVat } from "@/lib/vat"
 import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
@@ -60,12 +61,20 @@ export function ExpensesTable({ initialExpenses }: { initialExpenses: Expense[] 
       {
         accessorKey: "netAmount",
         header: "Net Amount",
-        cell: ({ row }) => (row.original.netAmount ? `$${Number.parseFloat(row.original.netAmount).toFixed(2)}` : "-"),
+        cell: ({ row }) => {
+          if (row.original.netAmount) return `$${Number.parseFloat(row.original.netAmount).toFixed(2)}`
+          const { netAmount } = calculateVat(Number.parseFloat(row.original.amount), 5, true)
+          return `$${netAmount.toFixed(2)}`
+        },
       },
       {
         accessorKey: "vatAmount",
         header: "VAT",
-        cell: ({ row }) => (row.original.vatAmount ? `$${Number.parseFloat(row.original.vatAmount).toFixed(2)}` : "-"),
+        cell: ({ row }) => {
+          if (row.original.vatAmount) return `$${Number.parseFloat(row.original.vatAmount).toFixed(2)}`
+          const { vatAmount } = calculateVat(Number.parseFloat(row.original.amount), 5, true)
+          return `$${vatAmount.toFixed(2)}`
+        },
       },
       {
         accessorKey: "date",
