@@ -1,6 +1,4 @@
-import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus } from "lucide-react"
 import { ClassTable } from "@/components/classes/class-table"
 import { ClassCalendar } from "@/components/classes/class-calendar"
 import { AddClassDialog } from "@/components/classes/add-class-dialog"
@@ -17,12 +15,7 @@ export default async function ClassesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Classes</h1>
           <p className="text-muted-foreground mt-1">Manage class schedules and enrollments</p>
         </div>
-        <AddClassDialog staff={staff}>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Class
-          </Button>
-        </AddClassDialog>
+        <AddClassDialog staff={staff} />
       </div>
 
       <Tabs defaultValue="list" className="space-y-4">
@@ -31,7 +24,7 @@ export default async function ClassesPage() {
           <TabsTrigger value="calendar">Calendar View</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="space-y-4">
-          <ClassTable classes={classes} />
+          <ClassTable classes={classes} staff={staff} />
         </TabsContent>
         <TabsContent value="calendar">
           <ClassCalendar classes={classes} />

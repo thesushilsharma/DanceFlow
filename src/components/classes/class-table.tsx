@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useMemo } from "react";
+import { useTransition, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,9 @@ import { MoreHorizontal, Users, Edit, Trash, ArrowUpDown } from "lucide-react";
 import { deleteClass } from "@/app/actions/classes";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
-import { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef } from "@tanstack/react-table";
+import { EditClassDialog } from "./edit-class-dialog";
+import { ManageEnrollmentsDialog } from "./manage-enrollments-dialog";
 
 type ClassWithDetails = {
   id: string;
@@ -31,7 +33,9 @@ type ClassWithDetails = {
   status: string;
   instructorFirstName: string | null;
   instructorLastName: string | null;
+  instructorId: string | null;
   enrollmentCount: number;
+  description?: string | null;
 };
 
 const statusColors = {
@@ -41,8 +45,17 @@ const statusColors = {
   cancelled: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
-export function ClassTable({ classes }: { classes: ClassWithDetails[] }) {
+export function ClassTable({ 
+  classes,
+  staff,
+}: { 
+  classes: ClassWithDetails[];
+  staff: Array<{ id: string; firstName: string; lastName: string }>;
+}) {
   const [isPending, startTransition] = useTransition();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [enrollmentsDialogOpen, setEnrollmentsDialogOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<ClassWithDetails | null>(null);
 
   const handleDelete = (id: string) => {
     if (!confirm("Are you sure you want to delete this class?")) return;
@@ -55,6 +68,16 @@ export function ClassTable({ classes }: { classes: ClassWithDetails[] }) {
         toast.error(result.error);
       }
     });
+  };
+
+  const handleEdit = (classItem: ClassWithDetails) => {
+    setSelectedClass(classItem);
+    setEditDialogOpen(true);
+  };
+
+  const handleManageEnrollments = (classItem: ClassWithDetails) => {
+    setSelectedClass(classItem);
+    setEnrollmentsDialogOpen(true);
   };
 
   const columns = useMemo<ColumnDef<ClassWithDetails>[]>(
@@ -152,11 +175,11 @@ export function ClassTable({ classes }: { classes: ClassWithDetails[] }) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleManageEnrollments(classItem)}>
                   <Users className="h-4 w-4 mr-2" />
                   Manage Enrollments
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleEdit(classItem)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
@@ -174,14 +197,48 @@ export function ClassTable({ classes }: { classes: ClassWithDetails[] }) {
         },
       },
     ],
-    [isPending]
+    [isPending, handleDelete, handleEdit, handleManageEnrollments]
   );
 
   return (
-    <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
-      <div className="border rounded-lg border-none shadow-none">
-        <DataTable columns={columns} data={classes} searchKey="name" />
+    <>
+      <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+        <div className="border rounded-lg border-none shadow-none">
+          <DataTable columns={columns} data={classes} searchKey="name" />
+        </div>
       </div>
-    </div>
+
+      {selectedClass && (
+        <>
+          <EditClassDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            classData={{
+              id: selectedClass.id,
+              name: selectedClass.name,
+              type: selectedClass.type,
+              level: selectedClass.level,
+              dayOfWeek: selectedClass.dayOfWeek,
+              startTime: selectedClass.startTime,
+              endTime: selectedClass.endTime,
+              room: selectedClass.room,
+              capacity: selectedClass.capacity,
+              tuition: selectedClass.tuition,
+              status: selectedClass.status,
+              description: selectedClass.description,
+              instructorId: selectedClass.instructorId,
+            }}
+            staff={staff}
+          />
+          <ManageEnrollmentsDialog
+            open={enrollmentsDialogOpen}
+            onOpenChange={setEnrollmentsDialogOpen}
+            classId={selectedClass.id}
+            className={selectedClass.name}
+            capacity={selectedClass.capacity}
+          />
+        </>
+      )}
+    </>
   );
 }
