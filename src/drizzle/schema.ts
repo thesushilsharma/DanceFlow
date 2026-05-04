@@ -181,6 +181,39 @@ export const eventParticipants = pgTable("event_participants", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
 
+export const offerTypeEnum = pgEnum("offer_type", [
+  "festive",
+  "staff",
+  "season",
+  "referral",
+  "student",
+  "flash",
+  "other",
+])
+export const offerStatusEnum = pgEnum("offer_status", ["active", "inactive", "expired", "scheduled"])
+export const discountTypeEnum = pgEnum("discount_type", ["percentage", "fixed"])
+
+export const offers = pgTable("offers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  offerType: text("offer_type").notNull(),
+  discountType: text("discount_type").notNull().default("percentage"),
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minPurchaseAmount: decimal("min_purchase_amount", { precision: 10, scale: 2 }),
+  maxDiscountAmount: decimal("max_discount_amount", { precision: 10, scale: 2 }),
+  couponCode: text("coupon_code"),
+  usageLimit: integer("usage_limit"),
+  usageCount: integer("usage_count").default(0),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  applicableTo: text("applicable_to").array(),
+  status: text("status").default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
 export const documents = pgTable("documents", {
   id: uuid("id").defaultRandom().primaryKey(),
   title: text("title").notNull(),
