@@ -99,7 +99,7 @@ export async function createOffer(prevState: any, formData: FormData) {
   }
 }
 
-export async function updateOffer(offerId: string, formData: FormData) {
+export async function updateOffer(offerId: string, prevState: any, formData: FormData) {
   try {
     const title = formData.get("title") as string
     const description = formData.get("description") as string

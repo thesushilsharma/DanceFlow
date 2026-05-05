@@ -10,6 +10,7 @@ import {
   FileText,
   BarChart3,
   Settings,
+  Tag,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -61,6 +62,11 @@ const menuItems = [
     title: "Events",
     icon: CalendarDays,
     href: "/dashboard/events",
+  },
+  {
+    title: "Offers",
+    icon: Tag,
+    href: "/dashboard/offers",
   },
   {
     title: "Documents",
