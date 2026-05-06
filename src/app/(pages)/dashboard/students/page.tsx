@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+
 import { StudentTable } from "@/components/students/student-table"
 import { AddStudentDialog } from "@/components/students/add-student-dialog"
 import { getStudents } from "@/app/actions/students"
@@ -15,12 +14,7 @@ export default async function StudentsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Students</h1>
           <p className="text-muted-foreground mt-1">Manage your dance studio students</p>
         </div>
-        <AddStudentDialog>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Student
-          </Button>
-        </AddStudentDialog>
+        <AddStudentDialog />
       </div>
 
       <SearchStudents />

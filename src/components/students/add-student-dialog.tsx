@@ -20,7 +20,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { createStudent } from "@/app/actions/students"
 import { toast } from "sonner"
 
-export function AddStudentDialog({ children }: { children: React.ReactNode }) {
+import { Plus } from "lucide-react"
+
+export function AddStudentDialog() {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -42,7 +44,12 @@ export function AddStudentDialog({ children }: { children: React.ReactNode }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Student
+        </Button>
+      </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Student</DialogTitle>
