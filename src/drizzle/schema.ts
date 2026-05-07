@@ -120,7 +120,9 @@ export const payments = pgTable("payments", {
     .references(() => students.id)
     .notNull(),
   classId: uuid("class_id").references(() => classes.id),
+  offerId: uuid("offer_id").references(() => offers.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
   netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
   vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }),
   paymentDate: date("payment_date").notNull(),
