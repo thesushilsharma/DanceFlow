@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { students, enrollments, classes, staff, attendance, payments, events, eventParticipants, documents } from "./schema";
+import { students, enrollments, classes, staff, attendance, payments, events, eventParticipants, documents, offers } from "./schema";
 
 export const studentsRelations = relations(students, ({ many }) => ({
   enrollments: many(enrollments),
@@ -50,6 +50,14 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
     fields: [payments.studentId],
     references: [students.id],
   }),
+  offer: one(offers, {
+    fields: [payments.offerId],
+    references: [offers.id],
+  }),
+}))
+
+export const offersRelations = relations(offers, ({ many }) => ({
+  payments: many(payments),
 }))
 
 export const eventsRelations = relations(events, ({ many }) => ({

@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getStudents } from "@/app/actions/students"
 import { getClasses } from "@/app/actions/classes"
+import { getOffers, type Offer } from "@/app/actions/offers"
 import { createPayment } from "@/app/actions/finances"
 import { toast } from "sonner"
 import { Search, Check } from "lucide-react"
@@ -40,6 +41,10 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [isSearching, setIsSearching] = useState(false)
   const [availableClasses, setAvailableClasses] = useState<ClassOption[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string>("")
+  const [availableOffers, setAvailableOffers] = useState<Offer[]>([])
+  const [selectedOfferId, setSelectedOfferId] = useState<string>("none")
+  const [baseAmount, setBaseAmount] = useState<string>("")
+  
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
 
@@ -85,6 +90,9 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
           }))
         )
       })
+      getOffers().then((results) => {
+        setAvailableOffers(results.filter((o) => o.status === "active"))
+      })
     }
 
     if (!open) {
@@ -100,8 +108,27 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
       setStudents([])
       setIsSearchOpen(false)
       setSelectedClassId("")
+      setSelectedOfferId("none")
+      setBaseAmount("")
     }
   }, [open])
+
+  // Calculate discounts
+  const selectedOffer = availableOffers.find((o) => o.id === selectedOfferId)
+  let calculatedDiscount = 0
+  const numericAmount = parseFloat(baseAmount) || 0
+  if (selectedOffer && numericAmount > 0) {
+    if (selectedOffer.discountType === "percentage") {
+      calculatedDiscount = numericAmount * (parseFloat(selectedOffer.discountValue) / 100)
+      if (selectedOffer.maxDiscountAmount) {
+        const max = parseFloat(selectedOffer.maxDiscountAmount)
+        if (calculatedDiscount > max) calculatedDiscount = max
+      }
+    } else {
+      calculatedDiscount = parseFloat(selectedOffer.discountValue)
+    }
+  }
+  const finalAmount = numericAmount > 0 ? Math.max(0, numericAmount - calculatedDiscount) : 0
 
   // Handle success/error states
   useEffect(() => {
@@ -240,20 +267,70 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            {/* Amount & Date */}
+            {/* Offer selector & Base Amount & Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount *</Label>
+                <Label htmlFor="baseAmount">{selectedOfferId !== "none" ? "Base Amount *" : "Amount *"}</Label>
                 <Input
-                  id="amount"
-                  name="amount"
+                  id="baseAmount"
+                  name={selectedOfferId === "none" ? "amount" : "baseAmount_ignore"}
                   type="number"
                   step="0.01"
                   placeholder="120.00"
                   required
                   disabled={isPending}
+                  value={baseAmount}
+                  onChange={(e) => setBaseAmount(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="offerId">Apply Offer</Label>
+                <Select
+                  name="offerId"
+                  value={selectedOfferId}
+                  onValueChange={setSelectedOfferId}
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="offerId">
+                    <SelectValue placeholder="Select offer (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {availableOffers.map((offer) => (
+                      <SelectItem key={offer.id} value={offer.id}>
+                        {offer.title} ({offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `$${offer.discountValue} off`})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedOfferId !== "none" && (
+                  <>
+                    <input type="hidden" name="offerId" value={selectedOfferId} />
+                    <input type="hidden" name="discountAmount" value={calculatedDiscount.toFixed(2)} />
+                    <input type="hidden" name="amount" value={finalAmount.toFixed(2)} />
+                  </>
+                )}
+              </div>
+            </div>
+
+            {selectedOfferId !== "none" && numericAmount > 0 && (
+              <div className="rounded-md bg-muted p-3 text-sm">
+                <div className="flex justify-between">
+                  <span>Base Amount:</span>
+                  <span>${numericAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-green-600">
+                  <span>Discount ({selectedOffer?.title}):</span>
+                  <span>-${calculatedDiscount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-medium mt-1 pt-1 border-t">
+                  <span>Final Payment Amount:</span>
+                  <span>${finalAmount.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="paymentDate">Date *</Label>
                 <Input

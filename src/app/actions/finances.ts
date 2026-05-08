@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { payments, expenses, students, classes } from "@/drizzle/schema"
+import { payments, expenses, students, classes, offers } from "@/drizzle/schema"
 import { eq, sql, gte } from "drizzle-orm"
 import { calculateVat } from "@/lib/vat"
 
@@ -23,13 +23,17 @@ export async function getPayments() {
         notes: payments.notes,
         studentId: payments.studentId,
         classId: payments.classId,
+        offerId: payments.offerId,
+        discountAmount: payments.discountAmount,
         studentFirstName: students.firstName,
         studentLastName: students.lastName,
         className: classes.name,
+        offerTitle: offers.title,
       })
       .from(payments)
       .leftJoin(students, eq(payments.studentId, students.id))
       .leftJoin(classes, eq(payments.classId, classes.id))
+      .leftJoin(offers, eq(payments.offerId, offers.id))
 
     return paymentsWithStudents.map((payment) => ({
       id: payment.id,
@@ -44,6 +48,9 @@ export async function getPayments() {
       receiptNumber: payment.receiptNumber,
       referenceNumber: payment.referenceNumber,
       className: payment.className,
+      offerId: payment.offerId,
+      offerTitle: payment.offerTitle,
+      discountAmount: payment.discountAmount,
       status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
       notes: payment.notes,
     }))
@@ -133,7 +140,9 @@ export async function createPayment(
   try {
     const studentId = formData.get("studentId") as string
     const classId = formData.get("classId") as string | null
+    const offerId = formData.get("offerId") as string | null
     const amount = formData.get("amount") as string
+    const discountAmount = formData.get("discountAmount") as string | null
     const paymentDate = formData.get("paymentDate") as string
     const paymentMethod = formData.get("paymentMethod") as string | null
     const paymentType = formData.get("paymentType") as string | null
@@ -161,7 +170,9 @@ export async function createPayment(
     await db.insert(payments).values({
       studentId,
       classId: classId && classId.trim() ? classId.trim() : null,
+      offerId: offerId && offerId.trim() ? offerId.trim() : null,
       amount: numericAmount.toString(),
+      discountAmount: discountAmount && !isNaN(parseFloat(discountAmount)) ? parseFloat(discountAmount).toString() : undefined,
       netAmount: netAmount.toString(),
       vatAmount: vatAmount.toString(),
       paymentDate,
