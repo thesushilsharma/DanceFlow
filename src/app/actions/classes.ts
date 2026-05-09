@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
 import { classes, enrollments, staff, students } from "@/drizzle/schema"
-import { eq, sql } from "drizzle-orm"
+import { eq, sql, inArray, and } from "drizzle-orm"
 
 export async function getClasses() {
   try {
@@ -205,17 +205,10 @@ export async function getClassEnrollments(classId: string) {
   }
 }
 
-export async function addEnrollment(classId: string, studentId: string) {
+export async function addEnrollment(classId: string, studentIds: string[]) {
   try {
-    // Check if enrollment already exists
-    const existing = await db
-      .select()
-      .from(enrollments)
-      .where(sql`${enrollments.classId} = ${classId} AND ${enrollments.studentId} = ${studentId}`)
-      .limit(1)
-
-    if (existing.length > 0) {
-      return { success: false, error: "Student is already enrolled in this class" }
+    if (!studentIds || studentIds.length === 0) {
+      return { success: false, error: "Please select at least one student" }
     }
 
     // Check class capacity
@@ -224,22 +217,37 @@ export async function addEnrollment(classId: string, studentId: string) {
       return { success: false, error: "Class not found" }
     }
 
+    // Check existing enrollments to prevent duplicates
+    const existing = await db
+      .select({ studentId: enrollments.studentId })
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, classId), inArray(enrollments.studentId, studentIds)))
+
+    const existingStudentIds = new Set(existing.map((e) => e.studentId))
+    const newStudentIds = studentIds.filter((id) => !existingStudentIds.has(id))
+
+    if (newStudentIds.length === 0) {
+      return { success: false, error: "All selected students are already enrolled" }
+    }
+
     const enrollmentCount = await db
       .select({ count: sql<number>`cast(count(*) as integer)` })
       .from(enrollments)
       .where(eq(enrollments.classId, classId))
 
-    if (enrollmentCount[0].count >= classData[0].maxCapacity) {
-      return { success: false, error: "Class is at full capacity" }
+    if (enrollmentCount[0].count + newStudentIds.length > classData[0].maxCapacity) {
+      return { success: false, error: `Class capacity exceeded. Cannot add ${newStudentIds.length} more student(s).` }
     }
 
-    await db.insert(enrollments).values({
+    const newEnrollments = newStudentIds.map((studentId) => ({
       studentId,
       classId,
       enrollmentDate: new Date().toISOString().split("T")[0],
       status: "active",
       paymentStatus: "pending",
-    })
+    }))
+
+    await db.insert(enrollments).values(newEnrollments)
 
     revalidatePath("/dashboard/classes")
     return { success: true }

@@ -25,6 +25,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
@@ -36,7 +49,8 @@ import {
   updateEnrollmentStatus,
 } from "@/app/actions/classes"
 import { getStudents } from "@/app/actions/students"
-import { Trash2, UserPlus, Loader2, ArrowUpDown } from "lucide-react"
+import { Trash2, UserPlus, Loader2, ArrowUpDown, Check, ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
   type ColumnDef,
   flexRender,
@@ -99,7 +113,8 @@ export function ManageEnrollmentsDialog({
   const [isPending, startTransition] = useTransition()
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [students, setStudents] = useState<Student[]>([])
-  const [selectedStudent, setSelectedStudent] = useState<string>("")
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([])
+  const [comboboxOpen, setComboboxOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -136,15 +151,15 @@ export function ManageEnrollmentsDialog({
   }
 
   const handleAddEnrollment = () => {
-    if (!selectedStudent) {
-      toast.error("Please select a student")
+    if (selectedStudents.length === 0) {
+      toast.error("Please select at least one student")
       return
     }
     startTransition(async () => {
-      const result = await addEnrollment(classId, selectedStudent)
+      const result = await addEnrollment(classId, selectedStudents)
       if (result.success) {
-        toast.success("Student enrolled successfully")
-        setSelectedStudent("")
+        toast.success("Students enrolled successfully")
+        setSelectedStudents([])
         await loadData()
         router.refresh()
       } else {
@@ -394,35 +409,65 @@ export function ManageEnrollmentsDialog({
                   className="h-9"
                 />
               </div>
-              <div className="min-w-[220px] flex-1 space-y-1.5">
+              <div className="min-w-[260px] flex-1 space-y-1.5">
                 <Label htmlFor="student-select" className="text-xs text-muted-foreground">
-                  Select Student
+                  Select Students
                 </Label>
-                <Select
-                  value={selectedStudent}
-                  onValueChange={setSelectedStudent}
-                  disabled={isPending || atCapacity}
-                >
-                  <SelectTrigger id="student-select" className="h-9">
-                    <SelectValue placeholder="Select a student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredStudents.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">No available students</div>
-                    ) : (
-                      filteredStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.firstName} {student.lastName}
-                          {student.level && ` (${student.level})`}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboboxOpen}
+                      disabled={isPending || atCapacity}
+                      className="h-9 w-full justify-between font-normal"
+                    >
+                      {selectedStudents.length > 0
+                        ? `${selectedStudents.length} student(s) selected`
+                        : "Select students..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search students..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No student found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredStudents.map((student) => {
+                            const isSelected = selectedStudents.includes(student.id)
+                            return (
+                              <CommandItem
+                                key={student.id}
+                                value={`${student.firstName} ${student.lastName} ${student.email || ""}`}
+                                onSelect={() => {
+                                  setSelectedStudents((current) =>
+                                    isSelected
+                                      ? current.filter((id) => id !== student.id)
+                                      : [...current, student.id]
+                                  )
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    isSelected ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {student.firstName} {student.lastName}
+                                {student.level && ` (${student.level})`}
+                              </CommandItem>
+                            )
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <Button
                 onClick={handleAddEnrollment}
-                disabled={isPending || !selectedStudent || atCapacity}
+                disabled={isPending || selectedStudents.length === 0 || atCapacity}
                 className="h-9 shrink-0 gap-2"
               >
                 <UserPlus className="h-4 w-4" />
