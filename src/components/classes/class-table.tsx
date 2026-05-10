@@ -11,13 +11,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Users, Edit, Trash, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Users, Edit, Trash, ArrowUpDown, Layers } from "lucide-react";
 import { deleteClass } from "@/app/actions/classes";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { EditClassDialog } from "./edit-class-dialog";
 import { ManageEnrollmentsDialog } from "./manage-enrollments-dialog";
+import { SessionsDialog } from "./sessions-dialog";
 
 type ClassWithDetails = {
   id: string;
@@ -55,6 +56,7 @@ export function ClassTable({
   const [isPending, startTransition] = useTransition();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [enrollmentsDialogOpen, setEnrollmentsDialogOpen] = useState(false);
+  const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassWithDetails | null>(null);
 
   const handleDelete = (id: string) => {
@@ -78,6 +80,11 @@ export function ClassTable({
   const handleManageEnrollments = (classItem: ClassWithDetails) => {
     setSelectedClass(classItem);
     setEnrollmentsDialogOpen(true);
+  };
+
+  const handleSessions = (classItem: ClassWithDetails) => {
+    setSelectedClass(classItem);
+    setSessionsDialogOpen(true);
   };
 
   const columns = useMemo<ColumnDef<ClassWithDetails>[]>(
@@ -175,9 +182,13 @@ export function ClassTable({
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleSessions(classItem)}>
+                  <Layers className="h-4 w-4 mr-2" />
+                  Sessions / Batches
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleManageEnrollments(classItem)}>
                   <Users className="h-4 w-4 mr-2" />
-                  Manage Enrollments
+                  Legacy Enrollments
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleEdit(classItem)}>
                   <Edit className="h-4 w-4 mr-2" />
@@ -236,6 +247,13 @@ export function ClassTable({
             classId={selectedClass.id}
             className={selectedClass.name}
             capacity={selectedClass.capacity}
+          />
+          <SessionsDialog
+            open={sessionsDialogOpen}
+            onOpenChange={setSessionsDialogOpen}
+            classId={selectedClass.id}
+            className={selectedClass.name}
+            classCapacity={selectedClass.capacity}
           />
         </>
       )}

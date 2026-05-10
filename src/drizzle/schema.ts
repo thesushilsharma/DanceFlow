@@ -84,6 +84,28 @@ export const classes = pgTable("classes", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
 
+// A Session (Batch) is a time-boxed run of a class with fresh choreography / song.
+// e.g. "Hip-Hop – Blinding Lights Batch" (Jun 1 – Jul 15)
+export const classSessions = pgTable("class_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  classId: uuid("class_id")
+    .references(() => classes.id, { onDelete: "cascade" })
+    .notNull(),
+  name: text("name").notNull(), // e.g. "Blinding Lights Batch"
+  songTitle: text("song_title"), // e.g. "Blinding Lights"
+  artist: text("artist"), // e.g. "The Weeknd"
+  choreographyNotes: text("choreography_notes"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  tuitionFee: decimal("tuition_fee", { precision: 10, scale: 2 }), // overrides class default
+  maxCapacity: integer("max_capacity"), // overrides class default
+  // upcoming | active | completed | cancelled
+  status: text("status").default("upcoming").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
 export const enrollments = pgTable("enrollments", {
   id: uuid("id").defaultRandom().primaryKey(),
   studentId: uuid("student_id")
@@ -92,9 +114,13 @@ export const enrollments = pgTable("enrollments", {
   classId: uuid("class_id")
     .references(() => classes.id)
     .notNull(),
+  // sessionId links enrollment to a specific batch/routine.
+  // null = legacy enrollment (no session concept applied yet)
+  sessionId: uuid("session_id").references(() => classSessions.id, { onDelete: "set null" }),
   enrollmentDate: date("enrollment_date").notNull(),
   status: text("status").default("active").notNull(),
   paymentStatus: text("payment_status").default("pending").notNull(),
+  notes: text("notes"), // e.g. "Renewed from previous batch"
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
@@ -214,6 +240,18 @@ export const offers = pgTable("offers", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+// Links an offer of type "bundle" to the classes included in the package.
+export const offerClasses = pgTable("offer_classes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  offerId: uuid("offer_id")
+    .references(() => offers.id, { onDelete: "cascade" })
+    .notNull(),
+  classId: uuid("class_id")
+    .references(() => classes.id, { onDelete: "cascade" })
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 })
 
 export const documents = pgTable("documents", {

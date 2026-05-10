@@ -147,3 +147,6 @@ next-env.d.ts
 .cursor/mcp.json
 .cursor/rules/nextjs.mdc
 /.agent
+/src/drizzle/migrations
+/public/uploads
+/src/drizzle/migrations

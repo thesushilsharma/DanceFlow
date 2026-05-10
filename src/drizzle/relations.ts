@@ -1,5 +1,9 @@
 import { relations } from "drizzle-orm/relations";
-import { students, enrollments, classes, staff, attendance, payments, events, eventParticipants, documents, offers } from "./schema";
+import {
+  students, enrollments, classes, staff, attendance, payments,
+  events, eventParticipants, documents, offers,
+  classSessions, offerClasses,
+} from "./schema";
 
 export const studentsRelations = relations(students, ({ many }) => ({
   enrollments: many(enrollments),
@@ -19,8 +23,19 @@ export const classesRelations = relations(classes, ({ one, many }) => ({
     fields: [classes.instructorId],
     references: [staff.id],
   }),
+  sessions: many(classSessions),
   enrollments: many(enrollments),
   attendance: many(attendance),
+  offerClasses: many(offerClasses),
+}))
+
+// A Session (Batch) belongs to one class and can have many enrollments
+export const classSessionsRelations = relations(classSessions, ({ one, many }) => ({
+  class: one(classes, {
+    fields: [classSessions.classId],
+    references: [classes.id],
+  }),
+  enrollments: many(enrollments),
 }))
 
 export const enrollmentsRelations = relations(enrollments, ({ one }) => ({
@@ -31,6 +46,11 @@ export const enrollmentsRelations = relations(enrollments, ({ one }) => ({
   class: one(classes, {
     fields: [enrollments.classId],
     references: [classes.id],
+  }),
+  // Optional: which specific session/batch this enrollment belongs to
+  session: one(classSessions, {
+    fields: [enrollments.sessionId],
+    references: [classSessions.id],
   }),
 }))
 
@@ -58,6 +78,19 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 
 export const offersRelations = relations(offers, ({ many }) => ({
   payments: many(payments),
+  offerClasses: many(offerClasses),
+}))
+
+// Join table: which classes are bundled in an offer
+export const offerClassesRelations = relations(offerClasses, ({ one }) => ({
+  offer: one(offers, {
+    fields: [offerClasses.offerId],
+    references: [offers.id],
+  }),
+  class: one(classes, {
+    fields: [offerClasses.classId],
+    references: [classes.id],
+  }),
 }))
 
 export const eventsRelations = relations(events, ({ many }) => ({
