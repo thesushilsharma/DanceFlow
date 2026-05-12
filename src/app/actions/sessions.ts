@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { classSessions, enrollments, students } from "@/drizzle/schema"
+import { classSessions, classes, enrollments, students } from "@/drizzle/schema"
 import { eq, and, sql, inArray } from "drizzle-orm"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -348,8 +348,8 @@ export async function renewSessionEnrollments(
 }
 
 /**
- * Get all active session enrollments for a student across all classes.
- * Used on the student profile page.
+ * Active enrollment rows for a student across all classes (any session dates).
+ * Used on the student profile Classes tab.
  */
 export async function getStudentActiveSessions(studentId: string) {
   try {
@@ -357,6 +357,7 @@ export async function getStudentActiveSessions(studentId: string) {
       .select({
         enrollmentId: enrollments.id,
         classId: enrollments.classId,
+        className: classes.name,
         sessionId: classSessions.id,
         sessionName: classSessions.name,
         songTitle: classSessions.songTitle,
@@ -370,7 +371,8 @@ export async function getStudentActiveSessions(studentId: string) {
       })
       .from(enrollments)
       .innerJoin(classSessions, eq(enrollments.sessionId, classSessions.id))
-      .where(eq(enrollments.studentId, studentId))
+      .innerJoin(classes, eq(enrollments.classId, classes.id))
+      .where(and(eq(enrollments.studentId, studentId), eq(enrollments.status, "active")))
 
     return rows
   } catch (error) {

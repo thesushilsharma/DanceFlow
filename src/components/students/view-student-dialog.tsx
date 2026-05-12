@@ -39,6 +39,7 @@ type StudentDocument = {
 type SessionEnrollment = {
   enrollmentId: string
   classId: string
+  className: string
   sessionId: string
   sessionName: string
   songTitle: string | null
@@ -199,9 +200,14 @@ export function ViewStudentDialog({ student, open, onOpenChange }: ViewStudentDi
                 {sessions.map((s) => (
                   <div key={s.enrollmentId} className="rounded-lg border p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Music2 className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="font-medium text-sm truncate">{s.sessionName}</span>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground truncate">
+                          {s.className}
+                        </span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Music2 className="h-4 w-4 shrink-0 text-primary" />
+                          <span className="font-medium text-sm truncate">{s.sessionName}</span>
+                        </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <Badge variant="secondary" className={`text-xs ${sessionStatusColors[s.sessionStatus]}`}>
