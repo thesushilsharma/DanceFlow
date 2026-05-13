@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
 import { classSessions, classes, enrollments, students } from "@/drizzle/schema"
-import { eq, and, sql, inArray } from "drizzle-orm"
+import { eq, and, sql, inArray, asc } from "drizzle-orm"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,7 @@ export async function getClassSessions(classId: string): Promise<ClassSession[]>
       )
       .where(eq(classSessions.classId, classId))
       .groupBy(classSessions.id)
+      .orderBy(asc(classSessions.startDate))
 
     return rows.map((r) => ({
       ...r,

@@ -239,7 +239,7 @@ export function SessionsDialog({
   }
 
   const handleRenew = (session: ClassSession) => {
-    // Find the next session (by date) to renew into
+    const pivot = session.endDate ?? session.startDate
     const others = sessions.filter(
       (s) => s.id !== session.id && (s.status === "upcoming" || s.status === "active")
     )
@@ -247,7 +247,14 @@ export function SessionsDialog({
       toast.info("Create a new upcoming session first, then renew into it")
       return
     }
-    const target = others[0]
+    const sorted = [...others].sort((a, b) => a.startDate.localeCompare(b.startDate))
+    const target = sorted.find((s) => s.startDate > pivot)
+    if (!target) {
+      toast.info(
+        "No upcoming or active session starts after this batch. Add one with a later start date (or set this batch’s end date)."
+      )
+      return
+    }
     if (
       !confirm(
         `Re-enrol all active students from "${session.name}" into "${target.name}"?\nStudents already in "${target.name}" will be skipped.`
