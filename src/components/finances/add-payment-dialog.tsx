@@ -37,12 +37,12 @@ type ClassLineItem = {
   amount: string
 }
 
-function createLineItem(): ClassLineItem {
-  return { key: crypto.randomUUID(), classId: "", amount: "" }
-}
+const INITIAL_LINE_ITEM: ClassLineItem = { key: "line-1", classId: "", amount: "" }
 
 export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
+  const [paymentDate, setPaymentDate] = useState("")
   const [state, formAction, isPending] = useActionState(createPayment, null)
   const [searchQuery, setSearchQuery] = useState("")
   const [students, setStudents] = useState<Array<{ id: string; firstName: string; lastName: string; email: string | null }>>([])
@@ -50,12 +50,17 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [availableClasses, setAvailableClasses] = useState<ClassOption[]>([])
-  const [lineItems, setLineItems] = useState<ClassLineItem[]>([createLineItem()])
+  const [lineItems, setLineItems] = useState<ClassLineItem[]>([INITIAL_LINE_ITEM])
   const [availableOffers, setAvailableOffers] = useState<Offer[]>([])
   const [selectedOfferId, setSelectedOfferId] = useState<string>("none")
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
+  const lineIdRef = useRef(1)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -113,8 +118,12 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
       setSelectedStudent(null)
       setStudents([])
       setIsSearchOpen(false)
-      setLineItems([createLineItem()])
+      setLineItems([INITIAL_LINE_ITEM])
+      lineIdRef.current = 1
       setSelectedOfferId("none")
+      setPaymentDate("")
+    } else {
+      setPaymentDate(new Date().toISOString().split("T")[0])
     }
   }, [open])
 
@@ -166,12 +175,14 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (state?.success && open) {
-      const classCount = classLinesForSubmit.length
-      toast.success(
-        classCount > 1
-          ? `Payment recorded for ${classCount} classes`
-          : "Payment added successfully"
-      )
+      const enrolledCount = state.enrolledCount ?? classLinesForSubmit.length
+      if (enrolledCount > 1) {
+        toast.success(`Payment recorded and student enrolled in ${enrolledCount} classes`)
+      } else if (enrolledCount === 1) {
+        toast.success("Payment recorded and student enrolled in class")
+      } else {
+        toast.success("Payment added successfully")
+      }
       setOpen(false)
       setSelectedStudent(null)
     } else if (state?.error && open) {
@@ -184,11 +195,19 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   }
 
   function addLineItem() {
-    setLineItems((items) => [...items, createLineItem()])
+    lineIdRef.current += 1
+    setLineItems((items) => [
+      ...items,
+      { key: `line-${lineIdRef.current}`, classId: "", amount: "" },
+    ])
   }
 
   function removeLineItem(key: string) {
     setLineItems((items) => (items.length <= 1 ? items : items.filter((item) => item.key !== key)))
+  }
+
+  if (!mounted) {
+    return children
   }
 
   return (
@@ -437,7 +456,8 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
                   name="paymentDate"
                   type="date"
                   required
-                  defaultValue={new Date().toISOString().split("T")[0]}
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
                   disabled={isPending}
                 />
               </div>

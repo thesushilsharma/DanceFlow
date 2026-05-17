@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { payments, expenses, students, classes, offers } from "@/drizzle/schema"
-import { eq, sql, gte } from "drizzle-orm"
+import { payments, expenses, students, classes, offers, enrollments } from "@/drizzle/schema"
+import { and, eq, sql, gte } from "drizzle-orm"
 import { calculateVat } from "@/lib/vat"
 
 export async function getPayments() {
@@ -131,6 +131,7 @@ export async function getFinancialSummary() {
 type PaymentState = {
   success?: boolean
   error?: string
+  enrolledCount?: number
 } | null
 
 type ClassLineItem = { classId: string; amount: number }
@@ -175,6 +176,64 @@ function splitDiscountAcrossLines(
       discountAmount: lineDiscount,
     }
   })
+}
+
+async function syncEnrollmentsForClassPayment(
+  tx: typeof db,
+  studentId: string,
+  classIds: string[],
+  enrollmentDate: string,
+  markAsPaid: boolean
+) {
+  const uniqueClassIds = [...new Set(classIds)]
+  if (uniqueClassIds.length === 0) return
+
+  const enrollmentPaymentStatus = markAsPaid ? "paid" : "pending"
+
+  for (const classId of uniqueClassIds) {
+    const [classData] = await tx
+      .select({ id: classes.id, name: classes.name, maxCapacity: classes.maxCapacity })
+      .from(classes)
+      .where(eq(classes.id, classId))
+      .limit(1)
+
+    if (!classData) {
+      throw new Error("One or more selected classes were not found")
+    }
+
+    const [existing] = await tx
+      .select({ id: enrollments.id, paymentStatus: enrollments.paymentStatus })
+      .from(enrollments)
+      .where(and(eq(enrollments.classId, classId), eq(enrollments.studentId, studentId)))
+      .limit(1)
+
+    if (existing) {
+      if (markAsPaid && existing.paymentStatus !== "paid") {
+        await tx
+          .update(enrollments)
+          .set({ paymentStatus: "paid", updatedAt: new Date() })
+          .where(eq(enrollments.id, existing.id))
+      }
+      continue
+    }
+
+    const [countRow] = await tx
+      .select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(enrollments)
+      .where(eq(enrollments.classId, classId))
+
+    if (countRow.count >= classData.maxCapacity) {
+      throw new Error(`${classData.name} is at full capacity. Payment was not recorded.`)
+    }
+
+    await tx.insert(enrollments).values({
+      studentId,
+      classId,
+      enrollmentDate,
+      status: "active",
+      paymentStatus: enrollmentPaymentStatus,
+    })
+  }
 }
 
 export async function createPayment(
@@ -238,47 +297,77 @@ export async function createPayment(
       notes: notes || undefined,
     }
 
-    if (lines.length === 0) {
-      const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
-      await db.insert(payments).values({
-        ...sharedFields,
-        classId: null,
-        amount: numericAmount.toString(),
-        discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
-        netAmount: netAmount.toString(),
-        vatAmount: vatAmount.toString(),
-      })
-    } else if (lines.length === 1) {
-      const line = lines[0]
-      const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
-      await db.insert(payments).values({
-        ...sharedFields,
-        classId: line.classId,
-        amount: numericAmount.toString(),
-        discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
-        netAmount: netAmount.toString(),
-        vatAmount: vatAmount.toString(),
-      })
-    } else {
-      const allocatedLines = splitDiscountAcrossLines(lines, parsedDiscount)
-      const paymentRows = allocatedLines.map((line) => {
-        const { netAmount, vatAmount } = calculateVat(line.amount, 5, true)
-        return {
+    const markEnrollmentPaid = status === "completed" || status === "paid"
+    const classIdsToEnroll = lines.map((line) => line.classId)
+
+    const runPaymentAndEnrollment = async (tx: typeof db) => {
+      if (lines.length === 0) {
+        const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+        await tx.insert(payments).values({
           ...sharedFields,
-          classId: line.classId,
-          amount: line.amount.toString(),
-          discountAmount: line.discountAmount > 0 ? line.discountAmount.toString() : undefined,
+          classId: null,
+          amount: numericAmount.toString(),
+          discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
           netAmount: netAmount.toString(),
           vatAmount: vatAmount.toString(),
-        }
+        })
+      } else if (lines.length === 1) {
+        const line = lines[0]
+        const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+        await tx.insert(payments).values({
+          ...sharedFields,
+          classId: line.classId,
+          amount: numericAmount.toString(),
+          discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
+          netAmount: netAmount.toString(),
+          vatAmount: vatAmount.toString(),
+        })
+      } else {
+        const allocatedLines = splitDiscountAcrossLines(lines, parsedDiscount)
+        const paymentRows = allocatedLines.map((line) => {
+          const { netAmount, vatAmount } = calculateVat(line.amount, 5, true)
+          return {
+            ...sharedFields,
+            classId: line.classId,
+            amount: line.amount.toString(),
+            discountAmount: line.discountAmount > 0 ? line.discountAmount.toString() : undefined,
+            netAmount: netAmount.toString(),
+            vatAmount: vatAmount.toString(),
+          }
+        })
+        await tx.insert(payments).values(paymentRows)
+      }
+
+      if (classIdsToEnroll.length > 0) {
+        await syncEnrollmentsForClassPayment(
+          tx,
+          studentId,
+          classIdsToEnroll,
+          paymentDate,
+          markEnrollmentPaid
+        )
+      }
+    }
+
+    if (classIdsToEnroll.length > 0) {
+      await db.transaction(async (tx) => {
+        await runPaymentAndEnrollment(tx as unknown as typeof db)
       })
-      await db.insert(payments).values(paymentRows)
+    } else {
+      await runPaymentAndEnrollment(db)
     }
 
     revalidatePath("/dashboard/finances")
-    return { success: true }
+    revalidatePath("/dashboard/classes")
+    return {
+      success: true,
+      enrolledCount: classIdsToEnroll.length > 0 ? classIdsToEnroll.length : undefined,
+    }
   } catch (error) {
     console.error("Error creating payment:", error)
+    if (error instanceof Error && error.message) {
+      return { success: false, error: error.message }
+    }
     return { success: false, error: "Failed to create payment" }
   }
 }

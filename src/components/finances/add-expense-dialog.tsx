@@ -20,10 +20,23 @@ import { createExpense } from "@/app/actions/finances"
 import { toast } from "sonner"
 
 export function AddExpenseDialog({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
+  const [expenseDate, setExpenseDate] = useState("")
   const [state, formAction, isPending] = useActionState(createExpense, null)
 
-  // Handle success/error states
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open) {
+      setExpenseDate("")
+    } else {
+      setExpenseDate(new Date().toISOString().split("T")[0])
+    }
+  }, [open])
+
   useEffect(() => {
     if (state?.success && open) {
       toast.success("Expense added successfully")
@@ -32,6 +45,10 @@ export function AddExpenseDialog({ children }: { children: React.ReactNode }) {
       toast.error(state.error)
     }
   }, [state, open])
+
+  if (!mounted) {
+    return children
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -86,7 +103,8 @@ export function AddExpenseDialog({ children }: { children: React.ReactNode }) {
                   name="date"
                   type="date"
                   required
-                  defaultValue={new Date().toISOString().split("T")[0]}
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
                   disabled={isPending}
                 />
               </div>
