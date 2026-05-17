@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef, useActionState } from "react"
+import { useState, useEffect, useRef, useActionState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,7 +21,7 @@ import { getClasses } from "@/app/actions/classes"
 import { getOffers, type Offer } from "@/app/actions/offers"
 import { createPayment } from "@/app/actions/finances"
 import { toast } from "sonner"
-import { Search, Check } from "lucide-react"
+import { Search, Check, Plus, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type ClassOption = {
@@ -29,6 +29,16 @@ type ClassOption = {
   name: string
   type: string
   dayOfWeek: string
+}
+
+type ClassLineItem = {
+  key: string
+  classId: string
+  amount: string
+}
+
+function createLineItem(): ClassLineItem {
+  return { key: crypto.randomUUID(), classId: "", amount: "" }
 }
 
 export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
@@ -40,15 +50,13 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [availableClasses, setAvailableClasses] = useState<ClassOption[]>([])
-  const [selectedClassId, setSelectedClassId] = useState<string>("")
+  const [lineItems, setLineItems] = useState<ClassLineItem[]>([createLineItem()])
   const [availableOffers, setAvailableOffers] = useState<Offer[]>([])
   const [selectedOfferId, setSelectedOfferId] = useState<string>("none")
-  const [baseAmount, setBaseAmount] = useState<string>("")
-  
+
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
 
-  // Debounced search for students
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
@@ -73,7 +81,6 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     }
   }, [searchQuery])
 
-  // Load initial students and classes when dialog opens
   useEffect(() => {
     if (open && !hasLoadedInitialRef.current && !searchQuery) {
       hasLoadedInitialRef.current = true
@@ -100,26 +107,31 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     }
   }, [open, searchQuery])
 
-  // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
       setSearchQuery("")
       setSelectedStudent(null)
       setStudents([])
       setIsSearchOpen(false)
-      setSelectedClassId("")
+      setLineItems([createLineItem()])
       setSelectedOfferId("none")
-      setBaseAmount("")
     }
   }, [open])
 
-  // Calculate discounts
+  const subtotal = useMemo(
+    () =>
+      lineItems.reduce((sum, line) => {
+        const value = parseFloat(line.amount)
+        return sum + (isNaN(value) ? 0 : value)
+      }, 0),
+    [lineItems]
+  )
+
   const selectedOffer = availableOffers.find((o) => o.id === selectedOfferId)
   let calculatedDiscount = 0
-  const numericAmount = parseFloat(baseAmount) || 0
-  if (selectedOffer && numericAmount > 0) {
+  if (selectedOffer && subtotal > 0) {
     if (selectedOffer.discountType === "percentage") {
-      calculatedDiscount = numericAmount * (parseFloat(selectedOffer.discountValue) / 100)
+      calculatedDiscount = subtotal * (parseFloat(selectedOffer.discountValue) / 100)
       if (selectedOffer.maxDiscountAmount) {
         const max = parseFloat(selectedOffer.maxDiscountAmount)
         if (calculatedDiscount > max) calculatedDiscount = max
@@ -128,30 +140,69 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
       calculatedDiscount = parseFloat(selectedOffer.discountValue)
     }
   }
-  const finalAmount = numericAmount > 0 ? Math.max(0, numericAmount - calculatedDiscount) : 0
+  const finalAmount = subtotal > 0 ? Math.max(0, subtotal - calculatedDiscount) : 0
 
-  // Handle success/error states
+  const classLinesForSubmit = useMemo(
+    () =>
+      lineItems
+        .filter((line) => line.classId && line.classId !== "none")
+        .map((line) => ({
+          classId: line.classId,
+          amount: parseFloat(line.amount) || 0,
+        }))
+        .filter((line) => line.amount > 0),
+    [lineItems]
+  )
+
+  const hasDuplicateClasses =
+    new Set(classLinesForSubmit.map((line) => line.classId)).size !== classLinesForSubmit.length
+
+  const multiClassMode = lineItems.length > 1
+  const canSubmit =
+    !!selectedStudent &&
+    subtotal > 0 &&
+    !hasDuplicateClasses &&
+    (!multiClassMode || classLinesForSubmit.length === lineItems.length)
+
   useEffect(() => {
     if (state?.success && open) {
-      toast.success("Payment added successfully")
+      const classCount = classLinesForSubmit.length
+      toast.success(
+        classCount > 1
+          ? `Payment recorded for ${classCount} classes`
+          : "Payment added successfully"
+      )
       setOpen(false)
       setSelectedStudent(null)
     } else if (state?.error && open) {
       toast.error(state.error)
     }
-  }, [state, open])
+  }, [state, open, classLinesForSubmit.length])
+
+  function updateLineItem(key: string, patch: Partial<Pick<ClassLineItem, "classId" | "amount">>) {
+    setLineItems((items) => items.map((item) => (item.key === key ? { ...item, ...patch } : item)))
+  }
+
+  function addLineItem() {
+    setLineItems((items) => [...items, createLineItem()])
+  }
+
+  function removeLineItem(key: string) {
+    setLineItems((items) => (items.length <= 1 ? items : items.filter((item) => item.key !== key)))
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Payment</DialogTitle>
-          <DialogDescription>Record a new payment from a student.</DialogDescription>
+          <DialogDescription>
+            Record a payment from a student. Add another class when paying for multiple classes at once.
+          </DialogDescription>
         </DialogHeader>
         <form action={formAction}>
           <div className="grid gap-4 py-4">
-            {/* Student selector */}
             <div className="space-y-2">
               <Label htmlFor="student">Student *</Label>
               <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
@@ -237,56 +288,93 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            {/* Class selector */}
-            <div className="space-y-2">
-              <Label htmlFor="classId">Class (Payment For)</Label>
-              <Select
-                name="classId"
-                value={selectedClassId}
-                onValueChange={setSelectedClassId}
-                disabled={isPending}
-              >
-                <SelectTrigger id="classId">
-                  <SelectValue placeholder="Select class (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— None —</SelectItem>
-                  {availableClasses.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        ({cls.dayOfWeek})
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* Pass empty string if "none" selected so the action receives null */}
-              {selectedClassId && selectedClassId !== "none" && (
-                <input type="hidden" name="classId" value={selectedClassId} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Classes (Payment For)</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={addLineItem}
+                  disabled={isPending}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add class
+                </Button>
+              </div>
+
+              {lineItems.map((line, index) => (
+                <div key={line.key} className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
+                  <div className="space-y-1">
+                    {index === 0 && (
+                      <Label className="text-xs text-muted-foreground">Class</Label>
+                    )}
+                    <Select
+                      value={line.classId || "none"}
+                      onValueChange={(value) =>
+                        updateLineItem(line.key, { classId: value === "none" ? "" : value })
+                      }
+                      disabled={isPending}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={multiClassMode ? "Select class *" : "Select class (optional)"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {!multiClassMode && <SelectItem value="none">— None —</SelectItem>}
+                        {availableClasses.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.name}
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({cls.dayOfWeek})
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    {index === 0 && (
+                      <Label className="text-xs text-muted-foreground">Amount *</Label>
+                    )}
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="120.00"
+                      required
+                      disabled={isPending}
+                      value={line.amount}
+                      onChange={(e) => updateLineItem(line.key, { amount: e.target.value })}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => removeLineItem(line.key)}
+                    disabled={isPending || lineItems.length <= 1}
+                    aria-label="Remove class"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              {hasDuplicateClasses && (
+                <p className="text-sm text-destructive">Each class can only be selected once.</p>
+              )}
+              {multiClassMode && classLinesForSubmit.length < lineItems.length && (
+                <p className="text-sm text-destructive">
+                  Select a class and amount for every line when paying for multiple classes.
+                </p>
               )}
             </div>
 
-            {/* Offer selector & Base Amount & Date */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="baseAmount">{selectedOfferId !== "none" ? "Base Amount *" : "Amount *"}</Label>
-                <Input
-                  id="baseAmount"
-                  name={selectedOfferId === "none" ? "amount" : "baseAmount_ignore"}
-                  type="number"
-                  step="0.01"
-                  placeholder="120.00"
-                  required
-                  disabled={isPending}
-                  value={baseAmount}
-                  onChange={(e) => setBaseAmount(e.target.value)}
-                />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="offerId">Apply Offer</Label>
                 <Select
-                  name="offerId"
                   value={selectedOfferId}
                   onValueChange={setSelectedOfferId}
                   disabled={isPending}
@@ -298,36 +386,47 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
                     <SelectItem value="none">— None —</SelectItem>
                     {availableOffers.map((offer) => (
                       <SelectItem key={offer.id} value={offer.id}>
-                        {offer.title} ({offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `$${offer.discountValue} off`})
+                        {offer.title} ({offer.discountType === "percentage" ? `${offer.discountValue}% off` : `$${offer.discountValue} off`})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedOfferId !== "none" && (
-                  <>
-                    <input type="hidden" name="offerId" value={selectedOfferId} />
-                    <input type="hidden" name="discountAmount" value={calculatedDiscount.toFixed(2)} />
-                    <input type="hidden" name="amount" value={finalAmount.toFixed(2)} />
-                  </>
-                )}
               </div>
             </div>
 
-            {selectedOfferId !== "none" && numericAmount > 0 && (
-              <div className="rounded-md bg-muted p-3 text-sm">
+            {(selectedOfferId !== "none" || classLinesForSubmit.length > 1) && subtotal > 0 && (
+              <div className="rounded-md bg-muted p-3 text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span>Base Amount:</span>
-                  <span>${numericAmount.toFixed(2)}</span>
+                  <span>Subtotal:</span>
+                  <span>${subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-green-600">
-                  <span>Discount ({selectedOffer?.title}):</span>
-                  <span>-${calculatedDiscount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-medium mt-1 pt-1 border-t">
-                  <span>Final Payment Amount:</span>
+                {selectedOfferId !== "none" && calculatedDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount ({selectedOffer?.title}):</span>
+                    <span>-${calculatedDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-medium pt-1 border-t">
+                  <span>Total payment:</span>
                   <span>${finalAmount.toFixed(2)}</span>
                 </div>
+                {classLinesForSubmit.length > 1 && (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    One payment record per class; same receipt number links them.
+                  </p>
+                )}
               </div>
+            )}
+
+            <input type="hidden" name="amount" value={finalAmount.toFixed(2)} />
+            {classLinesForSubmit.length > 0 && (
+              <input type="hidden" name="classLineItems" value={JSON.stringify(classLinesForSubmit)} />
+            )}
+            {selectedOfferId !== "none" && (
+              <>
+                <input type="hidden" name="offerId" value={selectedOfferId} />
+                <input type="hidden" name="discountAmount" value={calculatedDiscount.toFixed(2)} />
+              </>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -344,7 +443,6 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Receipt Number & Reference Number */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="receiptNumber">Receipt Number</Label>
@@ -366,7 +464,6 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Payment Method & Payment Type */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">Payment Method</Label>
@@ -402,7 +499,6 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Input
@@ -422,7 +518,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || !selectedStudent}>
+            <Button type="submit" disabled={isPending || !canSubmit}>
               {isPending ? "Adding..." : "Add Payment"}
             </Button>
           </DialogFooter>

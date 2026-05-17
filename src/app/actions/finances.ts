@@ -133,13 +133,58 @@ type PaymentState = {
   error?: string
 } | null
 
+type ClassLineItem = { classId: string; amount: number }
+
+function parseClassLineItems(raw: string | null): ClassLineItem[] {
+  if (!raw?.trim()) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") return null
+        const classId = "classId" in item ? String(item.classId) : ""
+        const amount = "amount" in item ? parseFloat(String(item.amount)) : NaN
+        if (!classId.trim() || isNaN(amount) || amount <= 0) return null
+        return { classId: classId.trim(), amount }
+      })
+      .filter((item): item is ClassLineItem => item !== null)
+  } catch {
+    return []
+  }
+}
+
+function splitDiscountAcrossLines(
+  lines: ClassLineItem[],
+  totalDiscount: number
+): { classId: string; amount: number; discountAmount: number }[] {
+  const subtotal = lines.reduce((sum, line) => sum + line.amount, 0)
+  if (subtotal <= 0) return []
+
+  let allocatedDiscount = 0
+  return lines.map((line, index) => {
+    const isLast = index === lines.length - 1
+    const lineDiscount = isLast
+      ? Math.max(0, totalDiscount - allocatedDiscount)
+      : Math.round(((line.amount / subtotal) * totalDiscount) * 100) / 100
+    allocatedDiscount += lineDiscount
+    const finalAmount = Math.max(0, line.amount - lineDiscount)
+    return {
+      classId: line.classId,
+      amount: finalAmount,
+      discountAmount: lineDiscount,
+    }
+  })
+}
+
 export async function createPayment(
   _prevState: PaymentState,
   formData: FormData
 ): Promise<PaymentState> {
   try {
     const studentId = formData.get("studentId") as string
-    const classId = formData.get("classId") as string | null
+    const legacyClassId = formData.get("classId") as string | null
+    const classLineItems = parseClassLineItems(formData.get("classLineItems") as string | null)
     const offerId = formData.get("offerId") as string | null
     const amount = formData.get("amount") as string
     const discountAmount = formData.get("discountAmount") as string | null
@@ -151,7 +196,6 @@ export async function createPayment(
     const status = (formData.get("status") as string) || "completed"
     const notes = formData.get("notes") as string | null
 
-    // Validate required fields
     if (!studentId) {
       return { success: false, error: "Please select a student" }
     }
@@ -160,21 +204,31 @@ export async function createPayment(
     }
 
     const numericAmount = parseFloat(amount)
-    if (isNaN(numericAmount)) {
+    if (isNaN(numericAmount) || numericAmount < 0) {
       return { success: false, error: "Invalid amount" }
     }
 
-    // Assume the entered amount is VAT inclusive (5% VAT rate default)
-    const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+    const parsedDiscount =
+      discountAmount && !isNaN(parseFloat(discountAmount)) ? parseFloat(discountAmount) : 0
+    const trimmedOfferId = offerId?.trim() || null
 
-    await db.insert(payments).values({
+    const lines =
+      classLineItems.length > 0
+        ? classLineItems
+        : legacyClassId?.trim()
+          ? [{ classId: legacyClassId.trim(), amount: numericAmount + parsedDiscount }]
+          : []
+
+    if (lines.length > 1) {
+      const uniqueClassIds = new Set(lines.map((line) => line.classId))
+      if (uniqueClassIds.size !== lines.length) {
+        return { success: false, error: "Each class can only be selected once per payment" }
+      }
+    }
+
+    const sharedFields = {
       studentId,
-      classId: classId && classId.trim() ? classId.trim() : null,
-      offerId: offerId && offerId.trim() ? offerId.trim() : null,
-      amount: numericAmount.toString(),
-      discountAmount: discountAmount && !isNaN(parseFloat(discountAmount)) ? parseFloat(discountAmount).toString() : undefined,
-      netAmount: netAmount.toString(),
-      vatAmount: vatAmount.toString(),
+      offerId: trimmedOfferId,
       paymentDate,
       paymentMethod: paymentMethod || undefined,
       paymentType: paymentType || undefined,
@@ -182,7 +236,44 @@ export async function createPayment(
       referenceNumber: referenceNumber || undefined,
       status,
       notes: notes || undefined,
-    })
+    }
+
+    if (lines.length === 0) {
+      const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+      await db.insert(payments).values({
+        ...sharedFields,
+        classId: null,
+        amount: numericAmount.toString(),
+        discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
+        netAmount: netAmount.toString(),
+        vatAmount: vatAmount.toString(),
+      })
+    } else if (lines.length === 1) {
+      const line = lines[0]
+      const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
+      await db.insert(payments).values({
+        ...sharedFields,
+        classId: line.classId,
+        amount: numericAmount.toString(),
+        discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
+        netAmount: netAmount.toString(),
+        vatAmount: vatAmount.toString(),
+      })
+    } else {
+      const allocatedLines = splitDiscountAcrossLines(lines, parsedDiscount)
+      const paymentRows = allocatedLines.map((line) => {
+        const { netAmount, vatAmount } = calculateVat(line.amount, 5, true)
+        return {
+          ...sharedFields,
+          classId: line.classId,
+          amount: line.amount.toString(),
+          discountAmount: line.discountAmount > 0 ? line.discountAmount.toString() : undefined,
+          netAmount: netAmount.toString(),
+          vatAmount: vatAmount.toString(),
+        }
+      })
+      await db.insert(payments).values(paymentRows)
+    }
 
     revalidatePath("/dashboard/finances")
     return { success: true }
