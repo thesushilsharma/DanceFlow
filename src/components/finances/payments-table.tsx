@@ -18,15 +18,21 @@ interface Payment {
   vatAmount: string | null
   paidDate: string | null
   method: string | null
-  status: "paid" | "pending" | "overdue" | "cancelled"
+  className: string | null
+  receiptNumber: string | null
+  offerTitle: string | null
+  status: "paid" | "pending" | "overdue" | "cancelled" | "completed" | "failed" | "refunded"
   notes: string | null
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   paid: "bg-green-500/10 text-green-700 dark:text-green-400",
+  completed: "bg-green-500/10 text-green-700 dark:text-green-400",
   pending: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
   overdue: "bg-red-500/10 text-red-700 dark:text-red-400",
   cancelled: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+  failed: "bg-red-500/10 text-red-700 dark:text-red-400",
+  refunded: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
 }
 
 export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] }) {
@@ -53,6 +59,11 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
           )
         },
         cell: ({ row }) => <span className="font-medium">{row.getValue("student")}</span>,
+      },
+      {
+        accessorKey: "className",
+        header: "Class",
+        cell: ({ row }) => row.original.className ?? "—",
       },
       {
         accessorKey: "amount",
@@ -83,6 +94,11 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
         cell: ({ row }) => (row.original.paidDate ? formatDate(row.original.paidDate, "SHORT") : "-"),
       },
       {
+        accessorKey: "receiptNumber",
+        header: "Receipt",
+        cell: ({ row }) => row.original.receiptNumber ?? "—",
+      },
+      {
         accessorKey: "method",
         header: "Method",
         cell: ({ row }) => row.original.method || "-",
@@ -91,7 +107,10 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => (
-          <Badge variant="secondary" className={statusColors[row.original.status]}>
+          <Badge
+            variant="secondary"
+            className={statusColors[row.original.status] ?? statusColors.pending}
+          >
             {row.original.status}
           </Badge>
         ),

@@ -2,7 +2,8 @@
 
 import { db } from "@/drizzle/db"
 import { classes, payments, expenses, attendance, enrollments } from "@/drizzle/schema"
-import { sql, gte, eq, and } from "drizzle-orm"
+import { sql, gte, eq, and, inArray } from "drizzle-orm"
+import { REVENUE_PAYMENT_STATUSES } from "@/lib/payment-status"
 
 export async function getFinancialStats() {
   try {
@@ -12,7 +13,12 @@ export async function getFinancialStats() {
     const revenue = await db
       .select({ total: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)` })
       .from(payments)
-      .where(and(gte(payments.paymentDate, firstDayOfMonth), eq(payments.status, "paid")))
+      .where(
+        and(
+          gte(payments.paymentDate, firstDayOfMonth),
+          inArray(payments.status, [...REVENUE_PAYMENT_STATUSES])
+        )
+      )
 
     const expensesTotal = await db
       .select({ total: sql<string>`COALESCE(sum(CAST(${expenses.amount} AS DECIMAL)), 0)` })
@@ -108,7 +114,12 @@ export async function getMonthlyRevenueData() {
         revenue: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)`,
       })
       .from(payments)
-      .where(and(gte(payments.paymentDate, sixMonthsAgo), eq(payments.status, "paid")))
+      .where(
+        and(
+          gte(payments.paymentDate, sixMonthsAgo),
+          inArray(payments.status, [...REVENUE_PAYMENT_STATUSES])
+        )
+      )
       .groupBy(sql`to_char(${payments.paymentDate}::date, 'Mon')`)
 
     return revenueData.map((item) => ({

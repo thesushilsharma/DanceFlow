@@ -2,7 +2,8 @@
 
 import { db } from "@/drizzle/db"
 import { students, classes, payments, attendance, enrollments, events } from "@/drizzle/schema"
-import { eq, gte, sql, desc, and } from "drizzle-orm"
+import { eq, gte, sql, desc, and, inArray } from "drizzle-orm"
+import { REVENUE_PAYMENT_STATUSES } from "@/lib/payment-status"
 
 export async function getDashboardStats() {
   try {
@@ -22,7 +23,12 @@ export async function getDashboardStats() {
     const revenue = await db
       .select({ total: sql<string>`COALESCE(sum(CAST(${payments.amount} AS DECIMAL)), 0)` })
       .from(payments)
-      .where(and(gte(payments.paymentDate, firstDayOfMonth), eq(payments.status, "paid")))
+      .where(
+        and(
+          gte(payments.paymentDate, firstDayOfMonth),
+          inArray(payments.status, [...REVENUE_PAYMENT_STATUSES])
+        )
+      )
 
     // Get attendance rate for current month
     const totalAttendance = await db

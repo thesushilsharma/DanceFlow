@@ -5,6 +5,7 @@ import { db } from "@/drizzle/db"
 import { payments, expenses, students, classes, offers, enrollments } from "@/drizzle/schema"
 import { and, eq, sql, gte } from "drizzle-orm"
 import { calculateVat } from "@/lib/vat"
+import { normalizePaymentDisplayStatus } from "@/lib/payment-status"
 
 export async function getPayments() {
   try {
@@ -51,7 +52,7 @@ export async function getPayments() {
       offerId: payment.offerId,
       offerTitle: payment.offerTitle,
       discountAmount: payment.discountAmount,
-      status: payment.status as "paid" | "pending" | "overdue" | "cancelled",
+      status: normalizePaymentDisplayStatus(payment.status),
       notes: payment.notes,
     }))
   } catch (error) {
@@ -220,7 +221,7 @@ async function syncEnrollmentsForClassPayment(
     const [countRow] = await tx
       .select({ count: sql<number>`cast(count(*) as integer)` })
       .from(enrollments)
-      .where(eq(enrollments.classId, classId))
+      .where(and(eq(enrollments.classId, classId), eq(enrollments.status, "active")))
 
     if (countRow.count >= classData.maxCapacity) {
       throw new Error(`${classData.name} is at full capacity. Payment was not recorded.`)
@@ -359,6 +360,7 @@ export async function createPayment(
 
     revalidatePath("/dashboard/finances")
     revalidatePath("/dashboard/classes")
+    revalidatePath("/dashboard/students")
     return {
       success: true,
       enrolledCount: classIdsToEnroll.length > 0 ? classIdsToEnroll.length : undefined,
