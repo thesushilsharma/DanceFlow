@@ -1,29 +1,23 @@
 "use client"
 
-import { useOptimistic, useMemo } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/date"
-import { calculateVat } from "@/lib/vat"
 import { DataTable } from "@/components/ui/data-table"
 import { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
-import { ArrowUpDown } from "lucide-react"
-
-interface Payment {
-  id: string
-  studentFirstName: string | null
-  studentLastName: string | null
-  amount: string
-  netAmount: string | null
-  vatAmount: string | null
-  paidDate: string | null
-  method: string | null
-  className: string | null
-  receiptNumber: string | null
-  offerTitle: string | null
-  status: "paid" | "pending" | "overdue" | "cancelled" | "completed" | "failed" | "refunded"
-  notes: string | null
-}
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ArrowUpDown, MoreHorizontal } from "lucide-react"
+import type { PaymentGroup } from "@/app/actions/finances"
+import { completePaymentGroup, voidPaymentGroup } from "@/app/actions/finances"
+import { toast } from "sonner"
+import { EditPaymentDialog } from "@/components/finances/edit-payment-dialog"
 
 const statusColors: Record<string, string> = {
   paid: "bg-green-500/10 text-green-700 dark:text-green-400",
@@ -31,14 +25,66 @@ const statusColors: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
   overdue: "bg-red-500/10 text-red-700 dark:text-red-400",
   cancelled: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
-  failed: "bg-red-500/10 text-red-700 dark:text-red-400",
   refunded: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+  failed: "bg-red-500/10 text-red-700 dark:text-red-400",
 }
 
-export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] }) {
-  const [optimisticPayments] = useOptimistic(initialPayments)
+function PaymentGroupActions({ group }: { group: PaymentGroup }) {
+  const [isPending, startTransition] = useTransition()
+  const [editOpen, setEditOpen] = useState(false)
 
-  const columns = useMemo<ColumnDef<Payment>[]>(
+  const isPendingPayment = group.rawStatus === "pending"
+  const canVoid = group.rawStatus !== "refunded" && group.rawStatus !== "cancelled"
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" disabled={isPending} aria-label="Payment actions">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
+          {isPendingPayment && (
+            <DropdownMenuItem
+              onClick={() =>
+                startTransition(async () => {
+                  const result = await completePaymentGroup(group.groupKey)
+                  if (result.success) toast.success("Payment marked as collected")
+                  else toast.error(result.error ?? "Failed to collect payment")
+                })
+              }
+            >
+              Mark collected
+            </DropdownMenuItem>
+          )}
+          {canVoid && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await voidPaymentGroup(group.groupKey)
+                    if (result.success) toast.success("Payment voided")
+                    else toast.error(result.error ?? "Failed to void payment")
+                  })
+                }
+              >
+                Void / refund
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <EditPaymentDialog group={group} open={editOpen} onOpenChange={setEditOpen} />
+    </>
+  )
+}
+
+export function PaymentsTable({ initialGroups }: { initialGroups: PaymentGroup[] }) {
+  const columns = useMemo<ColumnDef<PaymentGroup>[]>(
     () => [
       {
         id: "student",
@@ -46,52 +92,43 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
           row.studentFirstName && row.studentLastName
             ? `${row.studentFirstName} ${row.studentLastName}`
             : "Unknown Student",
-        header: ({ column }) => {
-          return (
-            <Button
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="-ml-4 text-left font-medium"
-            >
-              Student
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          )
-        },
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="-ml-4 text-left font-medium"
+          >
+            Student
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
         cell: ({ row }) => <span className="font-medium">{row.getValue("student")}</span>,
       },
       {
-        accessorKey: "className",
-        header: "Class",
-        cell: ({ row }) => row.original.className ?? "—",
+        accessorKey: "classLabel",
+        header: "Class(es)",
+        cell: ({ row }) => (
+          <div className="max-w-[220px]">
+            <span className="line-clamp-2">{row.original.classLabel}</span>
+            {row.original.isGrouped && (
+              <span className="text-xs text-muted-foreground block">
+                {row.original.lineItems.length} classes
+              </span>
+            )}
+          </div>
+        ),
       },
       {
-        accessorKey: "amount",
-        header: "Total Amount",
-        cell: ({ row }) => `$${Number.parseFloat(row.original.amount).toFixed(2)}`,
-      },
-      {
-        accessorKey: "netAmount",
-        header: "Net Amount",
-        cell: ({ row }) => {
-          if (row.original.netAmount) return `$${Number.parseFloat(row.original.netAmount).toFixed(2)}`
-          const { netAmount } = calculateVat(Number.parseFloat(row.original.amount), 5, true)
-          return `$${netAmount.toFixed(2)}`
-        },
-      },
-      {
-        accessorKey: "vatAmount",
-        header: "VAT",
-        cell: ({ row }) => {
-          if (row.original.vatAmount) return `$${Number.parseFloat(row.original.vatAmount).toFixed(2)}`
-          const { vatAmount } = calculateVat(Number.parseFloat(row.original.amount), 5, true)
-          return `$${vatAmount.toFixed(2)}`
-        },
+        id: "totalAmount",
+        accessorFn: (row) => row.totalAmount,
+        header: "Amount",
+        cell: ({ row }) => `$${row.original.totalAmount.toFixed(2)}`,
       },
       {
         accessorKey: "paidDate",
         header: "Paid Date",
-        cell: ({ row }) => (row.original.paidDate ? formatDate(row.original.paidDate, "SHORT") : "-"),
+        cell: ({ row }) =>
+          row.original.paidDate ? formatDate(row.original.paidDate, "SHORT") : "-",
       },
       {
         accessorKey: "receiptNumber",
@@ -101,7 +138,7 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
       {
         accessorKey: "method",
         header: "Method",
-        cell: ({ row }) => row.original.method || "-",
+        cell: ({ row }) => row.original.method ?? "-",
       },
       {
         accessorKey: "status",
@@ -115,13 +152,18 @@ export function PaymentsTable({ initialPayments }: { initialPayments: Payment[] 
           </Badge>
         ),
       },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => <PaymentGroupActions group={row.original} />,
+      },
     ],
     []
   )
 
   return (
     <div className="border rounded-lg border-none shadow-none">
-      <DataTable columns={columns} data={optimisticPayments} searchKey="student" />
+      <DataTable columns={columns} data={initialGroups} searchKey="student" />
     </div>
   )
 }

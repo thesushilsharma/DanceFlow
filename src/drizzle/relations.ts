@@ -3,7 +3,7 @@ import {
   students, enrollments, classes, staff, attendance, payments,
   events, eventParticipants, documents, offers,
   classSessions, offerClasses,
-} from "./schema";
+} from "./schema"
 
 export const studentsRelations = relations(students, ({ many }) => ({
   enrollments: many(enrollments),
@@ -47,10 +47,13 @@ export const enrollmentsRelations = relations(enrollments, ({ one }) => ({
     fields: [enrollments.classId],
     references: [classes.id],
   }),
-  // Optional: which specific session/batch this enrollment belongs to
   session: one(classSessions, {
     fields: [enrollments.sessionId],
     references: [classSessions.id],
+  }),
+  payment: one(payments, {
+    fields: [enrollments.paymentId],
+    references: [payments.id],
   }),
 }))
 
@@ -65,15 +68,24 @@ export const attendanceRelations = relations(attendance, ({ one }) => ({
   }),
 }))
 
-export const paymentsRelations = relations(payments, ({ one }) => ({
+export const paymentsRelations = relations(payments, ({ one, many }) => ({
   student: one(students, {
     fields: [payments.studentId],
     references: [students.id],
+  }),
+  class: one(classes, {
+    fields: [payments.classId],
+    references: [classes.id],
+  }),
+  session: one(classSessions, {
+    fields: [payments.sessionId],
+    references: [classSessions.id],
   }),
   offer: one(offers, {
     fields: [payments.offerId],
     references: [offers.id],
   }),
+  enrollments: many(enrollments),
 }))
 
 export const offersRelations = relations(offers, ({ many }) => ({

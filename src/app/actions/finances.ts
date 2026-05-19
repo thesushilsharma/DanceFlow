@@ -2,19 +2,37 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/drizzle/db"
-import { payments, expenses, students, classes, offers, enrollments } from "@/drizzle/schema"
-import { and, eq, sql, gte } from "drizzle-orm"
+import {
+  payments,
+  expenses,
+  students,
+  classes,
+  offers,
+  enrollments,
+  classSessions,
+} from "@/drizzle/schema"
+import { and, eq, sql, gte, inArray, isNull } from "drizzle-orm"
 import { calculateVat } from "@/lib/vat"
-import { normalizePaymentDisplayStatus } from "@/lib/payment-status"
+import { normalizePaymentDisplayStatus, REVENUE_PAYMENT_STATUSES } from "@/lib/payment-status"
+import { parseClassLineItems, splitDiscountAcrossLines, type ClassLineItem } from "@/lib/payment-line-items"
+import { groupPaymentRows, type PaymentGroup } from "@/lib/group-payments"
 
-export async function getPayments() {
+export type { PaymentGroup }
+
+function revalidateFinancePaths() {
+  revalidatePath("/dashboard/finances")
+  revalidatePath("/dashboard/classes")
+  revalidatePath("/dashboard/students")
+}
+
+export async function getGroupedPayments(): Promise<PaymentGroup[]> {
   try {
-    const paymentsWithStudents = await db
+    const rows = await db
       .select({
         id: payments.id,
+        paymentGroupId: payments.paymentGroupId,
         amount: payments.amount,
-        netAmount: payments.netAmount,
-        vatAmount: payments.vatAmount,
+        discountAmount: payments.discountAmount,
         paymentDate: payments.paymentDate,
         status: payments.status,
         paymentMethod: payments.paymentMethod,
@@ -24,41 +42,61 @@ export async function getPayments() {
         notes: payments.notes,
         studentId: payments.studentId,
         classId: payments.classId,
-        offerId: payments.offerId,
-        discountAmount: payments.discountAmount,
+        sessionId: payments.sessionId,
         studentFirstName: students.firstName,
         studentLastName: students.lastName,
         className: classes.name,
+        sessionName: classSessions.name,
         offerTitle: offers.title,
       })
       .from(payments)
       .leftJoin(students, eq(payments.studentId, students.id))
       .leftJoin(classes, eq(payments.classId, classes.id))
+      .leftJoin(classSessions, eq(payments.sessionId, classSessions.id))
       .leftJoin(offers, eq(payments.offerId, offers.id))
+      .orderBy(sql`${payments.paymentDate} desc`, sql`${payments.createdAt} desc`)
 
-    return paymentsWithStudents.map((payment) => ({
-      id: payment.id,
-      studentFirstName: payment.studentFirstName,
-      studentLastName: payment.studentLastName,
-      amount: payment.amount,
-      netAmount: payment.netAmount,
-      vatAmount: payment.vatAmount,
-      paidDate: payment.paymentDate ? String(payment.paymentDate) : null,
-      method: payment.paymentMethod,
-      paymentType: payment.paymentType,
-      receiptNumber: payment.receiptNumber,
-      referenceNumber: payment.referenceNumber,
-      className: payment.className,
-      offerId: payment.offerId,
-      offerTitle: payment.offerTitle,
-      discountAmount: payment.discountAmount,
-      status: normalizePaymentDisplayStatus(payment.status),
-      notes: payment.notes,
-    }))
+    return groupPaymentRows(
+      rows.map((row) => ({
+        ...row,
+        paymentDate: row.paymentDate ? String(row.paymentDate) : null,
+      }))
+    )
   } catch (error) {
     console.error("Error fetching payments:", error)
     return []
   }
+}
+
+/** @deprecated Use getGroupedPayments */
+export async function getPayments() {
+  const groups = await getGroupedPayments()
+  return groups.flatMap((group) =>
+    group.lineItems.map((line) => ({
+      id: line.paymentId,
+      studentFirstName: group.studentFirstName,
+      studentLastName: group.studentLastName,
+      amount: line.amount,
+      netAmount: null,
+      vatAmount: null,
+      paidDate: group.paidDate,
+      method: group.method,
+      paymentType: group.paymentType,
+      receiptNumber: group.receiptNumber,
+      referenceNumber: group.referenceNumber,
+      className: line.className,
+      offerId: null,
+      offerTitle: group.offerTitle,
+      discountAmount: line.discountAmount,
+      status: normalizePaymentDisplayStatus(line.status),
+      notes: group.notes,
+    }))
+  )
+}
+
+export async function getPaymentGroupByKey(groupKey: string): Promise<PaymentGroup | null> {
+  const groups = await getGroupedPayments()
+  return groups.find((g) => g.groupKey === groupKey) ?? null
 }
 
 export async function getExpenses() {
@@ -91,7 +129,12 @@ export async function getFinancialSummary() {
         total: sql<string>`cast(sum(${payments.amount}) as text)`,
       })
       .from(payments)
-      .where(gte(payments.paymentDate, currentMonth))
+      .where(
+        and(
+          gte(payments.paymentDate, currentMonth),
+          inArray(payments.status, [...REVENUE_PAYMENT_STATUSES])
+        )
+      )
 
     const [expensesResult] = await db
       .select({
@@ -135,106 +178,128 @@ type PaymentState = {
   enrolledCount?: number
 } | null
 
-type ClassLineItem = { classId: string; amount: number }
-
-function parseClassLineItems(raw: string | null): ClassLineItem[] {
-  if (!raw?.trim()) return []
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .map((item) => {
-        if (!item || typeof item !== "object") return null
-        const classId = "classId" in item ? String(item.classId) : ""
-        const amount = "amount" in item ? parseFloat(String(item.amount)) : NaN
-        if (!classId.trim() || isNaN(amount) || amount <= 0) return null
-        return { classId: classId.trim(), amount }
-      })
-      .filter((item): item is ClassLineItem => item !== null)
-  } catch {
-    return []
-  }
+type EnrollmentLine = {
+  classId: string
+  sessionId: string | null
+  paymentId: string
 }
 
-function splitDiscountAcrossLines(
-  lines: ClassLineItem[],
-  totalDiscount: number
-): { classId: string; amount: number; discountAmount: number }[] {
-  const subtotal = lines.reduce((sum, line) => sum + line.amount, 0)
-  if (subtotal <= 0) return []
-
-  let allocatedDiscount = 0
-  return lines.map((line, index) => {
-    const isLast = index === lines.length - 1
-    const lineDiscount = isLast
-      ? Math.max(0, totalDiscount - allocatedDiscount)
-      : Math.round(((line.amount / subtotal) * totalDiscount) * 100) / 100
-    allocatedDiscount += lineDiscount
-    const finalAmount = Math.max(0, line.amount - lineDiscount)
-    return {
-      classId: line.classId,
-      amount: finalAmount,
-      discountAmount: lineDiscount,
-    }
-  })
-}
-
-async function syncEnrollmentsForClassPayment(
+async function syncEnrollmentForPaymentLine(
   tx: typeof db,
   studentId: string,
-  classIds: string[],
+  line: EnrollmentLine,
   enrollmentDate: string,
   markAsPaid: boolean
 ) {
-  const uniqueClassIds = [...new Set(classIds)]
-  if (uniqueClassIds.length === 0) return
-
   const enrollmentPaymentStatus = markAsPaid ? "paid" : "pending"
 
-  for (const classId of uniqueClassIds) {
-    const [classData] = await tx
-      .select({ id: classes.id, name: classes.name, maxCapacity: classes.maxCapacity })
-      .from(classes)
-      .where(eq(classes.id, classId))
+  const existingQuery = line.sessionId
+    ? and(eq(enrollments.studentId, studentId), eq(enrollments.sessionId, line.sessionId))
+    : and(
+        eq(enrollments.studentId, studentId),
+        eq(enrollments.classId, line.classId),
+        isNull(enrollments.sessionId)
+      )
+
+  const [existing] = await tx
+    .select({ id: enrollments.id, paymentStatus: enrollments.paymentStatus })
+    .from(enrollments)
+    .where(existingQuery)
+    .limit(1)
+
+  if (existing) {
+    await tx
+      .update(enrollments)
+      .set({
+        paymentId: line.paymentId,
+        paymentStatus: markAsPaid ? "paid" : existing.paymentStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(enrollments.id, existing.id))
+    return
+  }
+
+  if (line.sessionId) {
+    const [session] = await tx
+      .select({
+        name: classSessions.name,
+        maxCapacity: classSessions.maxCapacity,
+      })
+      .from(classSessions)
+      .where(eq(classSessions.id, line.sessionId))
       .limit(1)
 
-    if (!classData) {
-      throw new Error("One or more selected classes were not found")
-    }
+    if (!session) throw new Error("Selected session was not found")
 
-    const [existing] = await tx
-      .select({ id: enrollments.id, paymentStatus: enrollments.paymentStatus })
-      .from(enrollments)
-      .where(and(eq(enrollments.classId, classId), eq(enrollments.studentId, studentId)))
-      .limit(1)
+    if (session.maxCapacity !== null) {
+      const [countRow] = await tx
+        .select({ count: sql<number>`cast(count(*) as integer)` })
+        .from(enrollments)
+        .where(
+          and(eq(enrollments.sessionId, line.sessionId), eq(enrollments.status, "active"))
+        )
 
-    if (existing) {
-      if (markAsPaid && existing.paymentStatus !== "paid") {
-        await tx
-          .update(enrollments)
-          .set({ paymentStatus: "paid", updatedAt: new Date() })
-          .where(eq(enrollments.id, existing.id))
+      if (countRow.count >= session.maxCapacity) {
+        throw new Error(`${session.name} is at full capacity. Payment was not recorded.`)
       }
-      continue
     }
+  } else {
+    const [classData] = await tx
+      .select({ name: classes.name, maxCapacity: classes.maxCapacity })
+      .from(classes)
+      .where(eq(classes.id, line.classId))
+      .limit(1)
+
+    if (!classData) throw new Error("One or more selected classes were not found")
 
     const [countRow] = await tx
       .select({ count: sql<number>`cast(count(*) as integer)` })
       .from(enrollments)
-      .where(and(eq(enrollments.classId, classId), eq(enrollments.status, "active")))
+      .where(and(eq(enrollments.classId, line.classId), eq(enrollments.status, "active")))
 
     if (countRow.count >= classData.maxCapacity) {
       throw new Error(`${classData.name} is at full capacity. Payment was not recorded.`)
     }
-
-    await tx.insert(enrollments).values({
-      studentId,
-      classId,
-      enrollmentDate,
-      status: "active",
-      paymentStatus: enrollmentPaymentStatus,
-    })
   }
+
+  await tx.insert(enrollments).values({
+    studentId,
+    classId: line.classId,
+    sessionId: line.sessionId,
+    paymentId: line.paymentId,
+    enrollmentDate,
+    status: "active",
+    paymentStatus: enrollmentPaymentStatus,
+  })
+}
+
+async function insertPaymentRows(
+  tx: typeof db,
+  rows: Array<{
+    studentId: string
+    paymentGroupId: string
+    classId: string | null
+    sessionId: string | null
+    offerId: string | null
+    amount: string
+    discountAmount?: string
+    netAmount: string
+    vatAmount: string
+    paymentDate: string
+    paymentMethod?: string
+    paymentType?: string
+    receiptNumber?: string
+    referenceNumber?: string
+    status: string
+    notes?: string
+  }>
+) {
+  if (rows.length === 0) return []
+  const inserted =
+    rows.length === 1
+      ? await tx.insert(payments).values(rows[0]).returning({ id: payments.id })
+      : await tx.insert(payments).values(rows).returning({ id: payments.id })
+  return inserted
 }
 
 export async function createPayment(
@@ -251,119 +316,136 @@ export async function createPayment(
     const paymentDate = formData.get("paymentDate") as string
     const paymentMethod = formData.get("paymentMethod") as string | null
     const paymentType = formData.get("paymentType") as string | null
-    const receiptNumber = formData.get("receiptNumber") as string | null
+    let receiptNumber = (formData.get("receiptNumber") as string | null)?.trim() || null
     const referenceNumber = formData.get("referenceNumber") as string | null
     const status = (formData.get("status") as string) || "completed"
     const notes = formData.get("notes") as string | null
 
-    if (!studentId) {
-      return { success: false, error: "Please select a student" }
-    }
+    if (!studentId) return { success: false, error: "Please select a student" }
     if (!amount || !paymentDate) {
       return { success: false, error: "Please fill in all required fields" }
     }
 
-    const numericAmount = parseFloat(amount)
-    if (isNaN(numericAmount) || numericAmount < 0) {
+    const numericAmount = Number.parseFloat(amount)
+    if (Number.isNaN(numericAmount) || numericAmount < 0) {
       return { success: false, error: "Invalid amount" }
     }
 
     const parsedDiscount =
-      discountAmount && !isNaN(parseFloat(discountAmount)) ? parseFloat(discountAmount) : 0
+      discountAmount && !Number.isNaN(Number.parseFloat(discountAmount))
+        ? Number.parseFloat(discountAmount)
+        : 0
     const trimmedOfferId = offerId?.trim() || null
 
-    const lines =
+    const lines: ClassLineItem[] =
       classLineItems.length > 0
         ? classLineItems
         : legacyClassId?.trim()
-          ? [{ classId: legacyClassId.trim(), amount: numericAmount + parsedDiscount }]
+          ? [{ classId: legacyClassId.trim(), sessionId: null, amount: numericAmount + parsedDiscount }]
           : []
 
     if (lines.length > 1) {
-      const uniqueClassIds = new Set(lines.map((line) => line.classId))
-      if (uniqueClassIds.size !== lines.length) {
-        return { success: false, error: "Each class can only be selected once per payment" }
+      const keys = new Set(lines.map((l) => `${l.classId}:${l.sessionId ?? ""}`))
+      if (keys.size !== lines.length) {
+        return { success: false, error: "Each class/session can only be selected once per payment" }
       }
     }
 
-    const sharedFields = {
-      studentId,
-      offerId: trimmedOfferId,
-      paymentDate,
-      paymentMethod: paymentMethod || undefined,
-      paymentType: paymentType || undefined,
-      receiptNumber: receiptNumber || undefined,
-      referenceNumber: referenceNumber || undefined,
-      status,
-      notes: notes || undefined,
+    if (!receiptNumber && lines.length > 0) {
+      receiptNumber = `RCP-${Date.now().toString(36).toUpperCase()}`
     }
 
+    const paymentGroupId = crypto.randomUUID()
     const markEnrollmentPaid = status === "completed" || status === "paid"
-    const classIdsToEnroll = lines.map((line) => line.classId)
 
-    const runPaymentAndEnrollment = async (tx: typeof db) => {
+    await db.transaction(async (tx) => {
+      const client = tx as unknown as typeof db
+      const shared = {
+        studentId,
+        paymentGroupId,
+        offerId: trimmedOfferId,
+        paymentDate,
+        paymentMethod: paymentMethod || undefined,
+        paymentType: paymentType || undefined,
+        receiptNumber: receiptNumber || undefined,
+        referenceNumber: referenceNumber || undefined,
+        status,
+        notes: notes || undefined,
+      }
+
+      const enrollmentLines: EnrollmentLine[] = []
+
       if (lines.length === 0) {
         const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
-        await tx.insert(payments).values({
-          ...sharedFields,
-          classId: null,
-          amount: numericAmount.toString(),
-          discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
-          netAmount: netAmount.toString(),
-          vatAmount: vatAmount.toString(),
-        })
+        await insertPaymentRows(client, [
+          {
+            ...shared,
+            classId: null,
+            sessionId: null,
+            amount: numericAmount.toString(),
+            discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
+            netAmount: netAmount.toString(),
+            vatAmount: vatAmount.toString(),
+          },
+        ])
       } else if (lines.length === 1) {
         const line = lines[0]
         const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
-        await tx.insert(payments).values({
-          ...sharedFields,
+        const [inserted] = await insertPaymentRows(client, [
+          {
+            ...shared,
+            classId: line.classId,
+            sessionId: line.sessionId ?? null,
+            amount: numericAmount.toString(),
+            discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
+            netAmount: netAmount.toString(),
+            vatAmount: vatAmount.toString(),
+          },
+        ])
+        enrollmentLines.push({
           classId: line.classId,
-          amount: numericAmount.toString(),
-          discountAmount: parsedDiscount > 0 ? parsedDiscount.toString() : undefined,
-          netAmount: netAmount.toString(),
-          vatAmount: vatAmount.toString(),
+          sessionId: line.sessionId ?? null,
+          paymentId: inserted.id,
         })
       } else {
-        const allocatedLines = splitDiscountAcrossLines(lines, parsedDiscount)
-        const paymentRows = allocatedLines.map((line) => {
-          const { netAmount, vatAmount } = calculateVat(line.amount, 5, true)
+        const allocated = splitDiscountAcrossLines(lines, parsedDiscount)
+        const paymentRows = allocated.map((line) => {
+          const { netAmount, vatAmount } = calculateVat(line.finalAmount, 5, true)
           return {
-            ...sharedFields,
+            ...shared,
             classId: line.classId,
-            amount: line.amount.toString(),
+            sessionId: line.sessionId ?? null,
+            amount: line.finalAmount.toString(),
             discountAmount: line.discountAmount > 0 ? line.discountAmount.toString() : undefined,
             netAmount: netAmount.toString(),
             vatAmount: vatAmount.toString(),
           }
         })
-        await tx.insert(payments).values(paymentRows)
+        const inserted = await insertPaymentRows(client, paymentRows)
+        for (let i = 0; i < allocated.length; i++) {
+          enrollmentLines.push({
+            classId: allocated[i].classId,
+            sessionId: allocated[i].sessionId ?? null,
+            paymentId: inserted[i].id,
+          })
+        }
       }
 
-      if (classIdsToEnroll.length > 0) {
-        await syncEnrollmentsForClassPayment(
-          tx,
+      for (const line of enrollmentLines) {
+        await syncEnrollmentForPaymentLine(
+          client,
           studentId,
-          classIdsToEnroll,
+          line,
           paymentDate,
           markEnrollmentPaid
         )
       }
-    }
+    })
 
-    if (classIdsToEnroll.length > 0) {
-      await db.transaction(async (tx) => {
-        await runPaymentAndEnrollment(tx as unknown as typeof db)
-      })
-    } else {
-      await runPaymentAndEnrollment(db)
-    }
-
-    revalidatePath("/dashboard/finances")
-    revalidatePath("/dashboard/classes")
-    revalidatePath("/dashboard/students")
+    revalidateFinancePaths()
     return {
       success: true,
-      enrolledCount: classIdsToEnroll.length > 0 ? classIdsToEnroll.length : undefined,
+      enrolledCount: lines.length > 0 ? lines.length : undefined,
     }
   } catch (error) {
     console.error("Error creating payment:", error)
@@ -371,6 +453,129 @@ export async function createPayment(
       return { success: false, error: error.message }
     }
     return { success: false, error: "Failed to create payment" }
+  }
+}
+
+export async function completePaymentGroup(groupKey: string): Promise<PaymentState> {
+  try {
+    const group = await getPaymentGroupByKey(groupKey)
+    if (!group) return { success: false, error: "Payment not found" }
+
+    await db.transaction(async (tx) => {
+      const client = tx as unknown as typeof db
+      await client
+        .update(payments)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(inArray(payments.id, group.paymentIds))
+
+      await client
+        .update(enrollments)
+        .set({ paymentStatus: "paid", updatedAt: new Date() })
+        .where(inArray(enrollments.paymentId, group.paymentIds))
+    })
+
+    revalidateFinancePaths()
+    return { success: true }
+  } catch (error) {
+    console.error("Error completing payment:", error)
+    return { success: false, error: "Failed to mark payment as collected" }
+  }
+}
+
+export async function voidPaymentGroup(
+  groupKey: string,
+  reason?: string
+): Promise<PaymentState> {
+  try {
+    const group = await getPaymentGroupByKey(groupKey)
+    if (!group) return { success: false, error: "Payment not found" }
+
+    await db.transaction(async (tx) => {
+      const client = tx as unknown as typeof db
+      await client
+        .update(payments)
+        .set({
+          status: "refunded",
+          notes: reason
+            ? [group.notes, `Voided: ${reason}`].filter(Boolean).join("\n")
+            : group.notes ?? undefined,
+          updatedAt: new Date(),
+        })
+        .where(inArray(payments.id, group.paymentIds))
+
+      await client
+        .update(enrollments)
+        .set({
+          paymentStatus: "pending",
+          paymentId: null,
+          updatedAt: new Date(),
+        })
+        .where(inArray(enrollments.paymentId, group.paymentIds))
+    })
+
+    revalidateFinancePaths()
+    return { success: true }
+  } catch (error) {
+    console.error("Error voiding payment:", error)
+    return { success: false, error: "Failed to void payment" }
+  }
+}
+
+type UpdatePaymentState = { success?: boolean; error?: string } | null
+
+export async function updatePaymentGroup(
+  _prev: UpdatePaymentState,
+  formData: FormData
+): Promise<UpdatePaymentState> {
+  try {
+    const groupKey = formData.get("groupKey") as string
+    const paymentDate = formData.get("paymentDate") as string
+    const paymentMethod = formData.get("paymentMethod") as string | null
+    const paymentType = formData.get("paymentType") as string | null
+    const receiptNumber = formData.get("receiptNumber") as string | null
+    const referenceNumber = formData.get("referenceNumber") as string | null
+    const status = formData.get("status") as string
+    const notes = formData.get("notes") as string | null
+
+    const group = await getPaymentGroupByKey(groupKey)
+    if (!group) return { success: false, error: "Payment not found" }
+
+    const markEnrollmentPaid = status === "completed" || status === "paid"
+
+    await db.transaction(async (tx) => {
+      const client = tx as unknown as typeof db
+      await client
+        .update(payments)
+        .set({
+          paymentDate,
+          paymentMethod: paymentMethod || undefined,
+          paymentType: paymentType || undefined,
+          receiptNumber: receiptNumber || undefined,
+          referenceNumber: referenceNumber || undefined,
+          status,
+          notes: notes || undefined,
+          updatedAt: new Date(),
+        })
+        .where(inArray(payments.id, group.paymentIds))
+
+      if (markEnrollmentPaid) {
+        await client
+          .update(enrollments)
+          .set({ paymentStatus: "paid", updatedAt: new Date() })
+          .where(inArray(enrollments.paymentId, group.paymentIds))
+      } else if (status === "pending") {
+        await client
+          .update(enrollments)
+          .set({ paymentStatus: "pending", updatedAt: new Date() })
+          .where(inArray(enrollments.paymentId, group.paymentIds))
+      }
+    })
+
+    revalidateFinancePaths()
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating payment:", error)
+    return { success: false, error: "Failed to update payment" }
   }
 }
 
@@ -392,17 +597,15 @@ export async function createExpense(
     const paymentMethod = formData.get("paymentMethod") as string
     const notes = formData.get("notes") as string
 
-    // Validate required fields
     if (!category || !description || !amount || !date) {
       return { success: false, error: "Please fill in all required fields" }
     }
 
-    const numericAmount = parseFloat(amount)
-    if (isNaN(numericAmount)) {
+    const numericAmount = Number.parseFloat(amount)
+    if (Number.isNaN(numericAmount)) {
       return { success: false, error: "Invalid amount" }
     }
 
-    // Assume the entered amount is VAT inclusive (5% VAT rate default)
     const { netAmount, vatAmount } = calculateVat(numericAmount, 5, true)
 
     await db.insert(expenses).values({

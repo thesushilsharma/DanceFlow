@@ -117,6 +117,7 @@ export const enrollments = pgTable("enrollments", {
   // sessionId links enrollment to a specific batch/routine.
   // null = legacy enrollment (no session concept applied yet)
   sessionId: uuid("session_id").references(() => classSessions.id, { onDelete: "set null" }),
+  paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
   enrollmentDate: date("enrollment_date").notNull(),
   status: text("status").default("active").notNull(),
   paymentStatus: text("payment_status").default("pending").notNull(),
@@ -142,10 +143,12 @@ export const attendance = pgTable("attendance", {
 
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
+  paymentGroupId: uuid("payment_group_id"),
   studentId: uuid("student_id")
     .references(() => students.id)
     .notNull(),
   classId: uuid("class_id").references(() => classes.id),
+  sessionId: uuid("session_id").references(() => classSessions.id, { onDelete: "set null" }),
   offerId: uuid("offer_id").references(() => offers.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),

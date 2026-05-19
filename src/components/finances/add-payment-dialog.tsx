@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { getStudents } from "@/app/actions/students"
 import { getClasses } from "@/app/actions/classes"
+import { getClassSessions, type ClassSession } from "@/app/actions/sessions"
 import { getOffers, type Offer } from "@/app/actions/offers"
 import { createPayment } from "@/app/actions/finances"
 import { toast } from "sonner"
@@ -29,15 +30,17 @@ type ClassOption = {
   name: string
   type: string
   dayOfWeek: string
+  tuition: string | null
 }
 
 type ClassLineItem = {
   key: string
   classId: string
+  sessionId: string
   amount: string
 }
 
-const INITIAL_LINE_ITEM: ClassLineItem = { key: "line-1", classId: "", amount: "" }
+const INITIAL_LINE_ITEM: ClassLineItem = { key: "line-1", classId: "", sessionId: "", amount: "" }
 
 export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -53,6 +56,8 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   const [lineItems, setLineItems] = useState<ClassLineItem[]>([INITIAL_LINE_ITEM])
   const [availableOffers, setAvailableOffers] = useState<Offer[]>([])
   const [selectedOfferId, setSelectedOfferId] = useState<string>("none")
+  const [paymentStatus, setPaymentStatus] = useState("completed")
+  const [sessionsByClassId, setSessionsByClassId] = useState<Record<string, ClassSession[]>>({})
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const hasLoadedInitialRef = useRef(false)
@@ -99,6 +104,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
             name: c.name,
             type: c.type,
             dayOfWeek: c.dayOfWeek,
+            tuition: c.tuition,
           }))
         )
       })
@@ -121,6 +127,8 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
       setLineItems([INITIAL_LINE_ITEM])
       lineIdRef.current = 1
       setSelectedOfferId("none")
+      setPaymentStatus("completed")
+      setSessionsByClassId({})
       setPaymentDate("")
     } else {
       setPaymentDate(new Date().toISOString().split("T")[0])
@@ -157,6 +165,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
         .filter((line) => line.classId && line.classId !== "none")
         .map((line) => ({
           classId: line.classId,
+          sessionId: line.sessionId || null,
           amount: parseFloat(line.amount) || 0,
         }))
         .filter((line) => line.amount > 0),
@@ -164,7 +173,8 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
   )
 
   const hasDuplicateClasses =
-    new Set(classLinesForSubmit.map((line) => line.classId)).size !== classLinesForSubmit.length
+    new Set(classLinesForSubmit.map((line) => `${line.classId}:${line.sessionId ?? ""}`)).size !==
+    classLinesForSubmit.length
 
   const multiClassMode = lineItems.length > 1
   const canSubmit =
@@ -190,7 +200,40 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     }
   }, [state, open, classLinesForSubmit.length])
 
-  function updateLineItem(key: string, patch: Partial<Pick<ClassLineItem, "classId" | "amount">>) {
+  function resolveTuition(classId: string, sessionId: string): string {
+    const cls = availableClasses.find((c) => c.id === classId)
+    if (sessionId) {
+      const session = sessionsByClassId[classId]?.find((s) => s.id === sessionId)
+      if (session?.tuitionFee) return session.tuitionFee
+    }
+    return cls?.tuition ?? ""
+  }
+
+  async function handleClassChange(lineKey: string, classId: string) {
+    updateLineItem(lineKey, { classId, sessionId: "", amount: "" })
+    if (!classId) return
+
+    if (!sessionsByClassId[classId]) {
+      const sessions = await getClassSessions(classId)
+      setSessionsByClassId((prev) => ({ ...prev, [classId]: sessions }))
+    }
+
+    const tuition = resolveTuition(classId, "")
+    if (tuition) updateLineItem(lineKey, { classId, sessionId: "", amount: tuition })
+  }
+
+  function handleSessionChange(lineKey: string, classId: string, sessionId: string) {
+    const tuition = resolveTuition(classId, sessionId === "none" ? "" : sessionId)
+    updateLineItem(lineKey, {
+      sessionId: sessionId === "none" ? "" : sessionId,
+      amount: tuition || lineItems.find((l) => l.key === lineKey)?.amount || "",
+    })
+  }
+
+  function updateLineItem(
+    key: string,
+    patch: Partial<Pick<ClassLineItem, "classId" | "sessionId" | "amount">>
+  ) {
     setLineItems((items) => items.map((item) => (item.key === key ? { ...item, ...patch } : item)))
   }
 
@@ -198,7 +241,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
     lineIdRef.current += 1
     setLineItems((items) => [
       ...items,
-      { key: `line-${lineIdRef.current}`, classId: "", amount: "" },
+      { key: `line-${lineIdRef.current}`, classId: "", sessionId: "", amount: "" },
     ])
   }
 
@@ -323,8 +366,11 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
                 </Button>
               </div>
 
-              {lineItems.map((line, index) => (
-                <div key={line.key} className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
+              {lineItems.map((line, index) => {
+                const sessions = line.classId ? sessionsByClassId[line.classId] ?? [] : []
+                return (
+                <motion.div key={line.key} className="space-y-2 rounded-md border p-3">
+                <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
                   <div className="space-y-1">
                     {index === 0 && (
                       <Label className="text-xs text-muted-foreground">Class</Label>
@@ -332,7 +378,7 @@ export function AddPaymentDialog({ children }: { children: React.ReactNode }) {
                     <Select
                       value={line.classId || "none"}
                       onValueChange={(value) =>
-                        updateLineItem(line.key, { classId: value === "none" ? "" : value })
+                        handleClassChange(line.key, value === "none" ? "" : value)
                       }
                       disabled={isPending}
                     >
