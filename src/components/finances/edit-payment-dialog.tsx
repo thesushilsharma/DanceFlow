@@ -1,6 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useActionState } from "react"
+import { useActionState, useEffect } from "react";
+import { toast } from "sonner";
+import { updatePaymentGroup } from "@/app/actions/finances";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,37 +11,43 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import type { PaymentGroup } from "@/app/actions/finances"
-import { updatePaymentGroup } from "@/app/actions/finances"
-import { toast } from "sonner"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { PaymentGroup } from "@/lib/group-payments";
 
 export function EditPaymentDialog({
   group,
   open,
   onOpenChange,
 }: {
-  group: PaymentGroup
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  group: PaymentGroup;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [state, formAction, isPending] = useActionState(updatePaymentGroup, null)
+  const [state, formAction, isPending] = useActionState(
+    updatePaymentGroup,
+    null,
+  );
 
   useEffect(() => {
     if (state?.success && open) {
-      toast.success("Payment updated")
-      onOpenChange(false)
+      toast.success("Payment updated");
+      onOpenChange(false);
     } else if (state?.error && open) {
-      toast.error(state.error)
+      toast.error(state.error);
     }
-  }, [state, open, onOpenChange])
+  }, [state, open, onOpenChange]);
 
   const statusValue =
-    group.rawStatus === "completed" ? "completed" : group.rawStatus
+    group.rawStatus === "completed" ? "completed" : group.rawStatus;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,7 +90,10 @@ export function EditPaymentDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-method">Method</Label>
-                <Select name="paymentMethod" defaultValue={group.method ?? undefined}>
+                <Select
+                  name="paymentMethod"
+                  defaultValue={group.method ?? undefined}
+                >
                   <SelectTrigger id="edit-method" disabled={isPending}>
                     <SelectValue placeholder="Method" />
                   </SelectTrigger>
@@ -120,7 +132,10 @@ export function EditPaymentDialog({
 
             <div className="space-y-2">
               <Label htmlFor="edit-type">Payment type</Label>
-              <Select name="paymentType" defaultValue={group.paymentType ?? undefined}>
+              <Select
+                name="paymentType"
+                defaultValue={group.paymentType ?? undefined}
+              >
                 <SelectTrigger id="edit-type" disabled={isPending}>
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
@@ -147,7 +162,9 @@ export function EditPaymentDialog({
 
             {group.lineItems.length > 1 && (
               <div className="rounded-md bg-muted p-3 text-xs space-y-1">
-                <p className="font-medium">Line items (amounts not editable here)</p>
+                <p className="font-medium">
+                  Line items (amounts not editable here)
+                </p>
                 {group.lineItems.map((line) => (
                   <p key={line.paymentId}>
                     {line.className}
@@ -159,7 +176,12 @@ export function EditPaymentDialog({
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
@@ -169,5 +191,5 @@ export function EditPaymentDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

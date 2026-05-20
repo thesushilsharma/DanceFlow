@@ -1,29 +1,39 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DollarSign, TrendingUp, TrendingDown, CreditCard } from "lucide-react"
-import { PaymentsTable } from "@/components/finances/payments-table"
-import { ExpensesTable } from "@/components/finances/expenses-table"
-import { AddPaymentDialog } from "@/components/finances/add-payment-dialog"
-import { AddExpenseDialog } from "@/components/finances/add-expense-dialog"
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
-import { getPayments, getExpenses } from "@/app/actions/finances"
+import {
+  CreditCard,
+  DollarSign,
+  Plus,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import {
+  getExpenses,
+  getFinancialSummary,
+  getGroupedPayments,
+} from "@/app/actions/finances";
+import { AddExpenseDialog } from "@/components/finances/add-expense-dialog";
+import { AddPaymentDialog } from "@/components/finances/add-payment-dialog";
+import { ExpensesTable } from "@/components/finances/expenses-table";
+import { PaymentsTable } from "@/components/finances/payments-table";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function FinancesPage() {
-  const [payments, expenses] = await Promise.all([getPayments(), getExpenses()])
+  const [paymentGroups, expenses, summary] = await Promise.all([
+    getGroupedPayments(),
+    getExpenses(),
+    getFinancialSummary(),
+  ]);
 
-  const totalRevenue = payments.reduce((sum: number, p) => sum + Number.parseFloat(p.amount), 0)
-  const totalExpenses = expenses.reduce((sum: number, e) => sum + Number.parseFloat(e.amount), 0)
-  const netProfit = totalRevenue - totalExpenses
-  const outstanding = payments
-    .filter((p) => p.status === "pending")
-    .reduce((sum: number, p) => sum + Number.parseFloat(p.amount), 0)
+  const { totalRevenue, totalExpenses, netProfit, outstanding } = summary;
 
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Finances</h1>
-        <p className="text-muted-foreground mt-1">Track payments, expenses, and financial reports</p>
+        <p className="text-muted-foreground mt-1">
+          Track payments, expenses, and financial reports
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -40,11 +50,15 @@ export default async function FinancesPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Expenses
+            </CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalExpenses.toFixed(2)}</div>
+            <div className="text-2xl font-bold">
+              ${totalExpenses.toFixed(2)}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">This month</p>
           </CardContent>
         </Card>
@@ -71,7 +85,9 @@ export default async function FinancesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${outstanding.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Pending payments</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Pending payments
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -99,12 +115,12 @@ export default async function FinancesPage() {
         </div>
 
         <TabsContent value="payments">
-          <PaymentsTable initialPayments={payments} />
+          <PaymentsTable initialGroups={paymentGroups} />
         </TabsContent>
         <TabsContent value="expenses">
           <ExpensesTable initialExpenses={expenses} />
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

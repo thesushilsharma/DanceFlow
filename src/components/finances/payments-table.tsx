@@ -1,23 +1,23 @@
-"use client"
+"use client";
 
-import { useMemo, useState, useTransition } from "react"
-import { Badge } from "@/components/ui/badge"
-import { formatDate } from "@/lib/date"
-import { DataTable } from "@/components/ui/data-table"
-import { ColumnDef } from "@tanstack/react-table"
-import { Button } from "@/components/ui/button"
+import type { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { toast } from "sonner";
+import { completePaymentGroup, voidPaymentGroup } from "@/app/actions/finances";
+import { EditPaymentDialog } from "@/components/finances/edit-payment-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ArrowUpDown, MoreHorizontal } from "lucide-react"
-import type { PaymentGroup } from "@/app/actions/finances"
-import { completePaymentGroup, voidPaymentGroup } from "@/app/actions/finances"
-import { toast } from "sonner"
-import { EditPaymentDialog } from "@/components/finances/edit-payment-dialog"
+} from "@/components/ui/dropdown-menu";
+import { formatDate } from "@/lib/date";
+import type { PaymentGroup } from "@/lib/group-payments";
 
 const statusColors: Record<string, string> = {
   paid: "bg-green-500/10 text-green-700 dark:text-green-400",
@@ -27,32 +27,42 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   refunded: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   failed: "bg-red-500/10 text-red-700 dark:text-red-400",
-}
+};
 
 function PaymentGroupActions({ group }: { group: PaymentGroup }) {
-  const [isPending, startTransition] = useTransition()
-  const [editOpen, setEditOpen] = useState(false)
+  const [isPending, startTransition] = useTransition();
+  const [editOpen, setEditOpen] = useState(false);
 
-  const isPendingPayment = group.rawStatus === "pending"
-  const canVoid = group.rawStatus !== "refunded" && group.rawStatus !== "cancelled"
+  const isPendingPayment = group.rawStatus === "pending";
+  const canVoid =
+    group.rawStatus !== "refunded" && group.rawStatus !== "cancelled";
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" disabled={isPending} aria-label="Payment actions">
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={isPending}
+            aria-label="Payment actions"
+          >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>
+            Edit
+          </DropdownMenuItem>
           {isPendingPayment && (
             <DropdownMenuItem
               onClick={() =>
                 startTransition(async () => {
-                  const result = await completePaymentGroup(group.groupKey)
-                  if (result.success) toast.success("Payment marked as collected")
-                  else toast.error(result.error ?? "Failed to collect payment")
+                  const result = await completePaymentGroup(group.groupKey);
+                  if (result?.success)
+                    toast.success("Payment marked as collected");
+                  else
+                    toast.error(result?.error ?? "Failed to collect payment");
                 })
               }
             >
@@ -66,9 +76,9 @@ function PaymentGroupActions({ group }: { group: PaymentGroup }) {
                 className="text-destructive focus:text-destructive"
                 onClick={() =>
                   startTransition(async () => {
-                    const result = await voidPaymentGroup(group.groupKey)
-                    if (result.success) toast.success("Payment voided")
-                    else toast.error(result.error ?? "Failed to void payment")
+                    const result = await voidPaymentGroup(group.groupKey);
+                    if (result?.success) toast.success("Payment voided");
+                    else toast.error(result?.error ?? "Failed to void payment");
                   })
                 }
               >
@@ -78,12 +88,20 @@ function PaymentGroupActions({ group }: { group: PaymentGroup }) {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <EditPaymentDialog group={group} open={editOpen} onOpenChange={setEditOpen} />
+      <EditPaymentDialog
+        group={group}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
     </>
-  )
+  );
 }
 
-export function PaymentsTable({ initialGroups }: { initialGroups: PaymentGroup[] }) {
+export function PaymentsTable({
+  initialGroups,
+}: {
+  initialGroups: PaymentGroup[];
+}) {
   const columns = useMemo<ColumnDef<PaymentGroup>[]>(
     () => [
       {
@@ -102,7 +120,9 @@ export function PaymentsTable({ initialGroups }: { initialGroups: PaymentGroup[]
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }) => <span className="font-medium">{row.getValue("student")}</span>,
+        cell: ({ row }) => (
+          <span className="font-medium">{row.getValue("student")}</span>
+        ),
       },
       {
         accessorKey: "classLabel",
@@ -128,7 +148,9 @@ export function PaymentsTable({ initialGroups }: { initialGroups: PaymentGroup[]
         accessorKey: "paidDate",
         header: "Paid Date",
         cell: ({ row }) =>
-          row.original.paidDate ? formatDate(row.original.paidDate, "SHORT") : "-",
+          row.original.paidDate
+            ? formatDate(row.original.paidDate, "SHORT")
+            : "-",
       },
       {
         accessorKey: "receiptNumber",
@@ -146,7 +168,9 @@ export function PaymentsTable({ initialGroups }: { initialGroups: PaymentGroup[]
         cell: ({ row }) => (
           <Badge
             variant="secondary"
-            className={statusColors[row.original.status] ?? statusColors.pending}
+            className={
+              statusColors[row.original.status] ?? statusColors.pending
+            }
           >
             {row.original.status}
           </Badge>
@@ -158,12 +182,12 @@ export function PaymentsTable({ initialGroups }: { initialGroups: PaymentGroup[]
         cell: ({ row }) => <PaymentGroupActions group={row.original} />,
       },
     ],
-    []
-  )
+    [],
+  );
 
   return (
     <div className="border rounded-lg border-none shadow-none">
       <DataTable columns={columns} data={initialGroups} searchKey="student" />
     </div>
-  )
+  );
 }
