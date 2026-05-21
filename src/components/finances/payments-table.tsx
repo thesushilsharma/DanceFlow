@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { completePaymentGroup, voidPaymentGroup } from "@/app/actions/finances";
 import { EditPaymentDialog } from "@/components/finances/edit-payment-dialog";
+import { ReceiptDialog } from "@/components/finances/receipt-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -32,6 +33,7 @@ const statusColors: Record<string, string> = {
 function PaymentGroupActions({ group }: { group: PaymentGroup }) {
   const [isPending, startTransition] = useTransition();
   const [editOpen, setEditOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const isPendingPayment = group.rawStatus === "pending";
   const canVoid =
@@ -51,6 +53,9 @@ function PaymentGroupActions({ group }: { group: PaymentGroup }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setReceiptOpen(true)}>
+            Receipt / email
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
             Edit
           </DropdownMenuItem>
@@ -92,6 +97,11 @@ function PaymentGroupActions({ group }: { group: PaymentGroup }) {
         group={group}
         open={editOpen}
         onOpenChange={setEditOpen}
+      />
+      <ReceiptDialog
+        group={group}
+        open={receiptOpen}
+        onOpenChange={setReceiptOpen}
       />
     </>
   );

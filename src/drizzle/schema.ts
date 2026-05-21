@@ -1,12 +1,57 @@
-import { pgTable, text, integer, timestamp, decimal, date, pgEnum, uuid, time } from "drizzle-orm/pg-core"
+import {
+  date,
+  decimal,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  time,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
-export const studentStatusEnum = pgEnum("student_status", ["active", "inactive", "on-hold", "graduated"])
-export const paymentStatusEnum = pgEnum("payment_status", ["pending", "completed", "failed", "refunded"])
-export const classStatusEnum = pgEnum("class_status", ["active", "inactive", "full"])
-export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent", "late", "excused"])
-export const staffRoleEnum = pgEnum("staff_role", ["instructor", "admin", "assistant", "owner"])
-export const eventTypeEnum = pgEnum("event_type", ["recital", "competition", "workshop", "performance", "other"])
-export const eventStatusEnum = pgEnum("event_status", ["scheduled", "in-progress", "completed", "cancelled"])
+export const studentStatusEnum = pgEnum("student_status", [
+  "active",
+  "inactive",
+  "on-hold",
+  "graduated",
+]);
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "completed",
+  "failed",
+  "refunded",
+]);
+export const classStatusEnum = pgEnum("class_status", [
+  "active",
+  "inactive",
+  "full",
+]);
+export const attendanceStatusEnum = pgEnum("attendance_status", [
+  "present",
+  "absent",
+  "late",
+  "excused",
+]);
+export const staffRoleEnum = pgEnum("staff_role", [
+  "instructor",
+  "admin",
+  "assistant",
+  "owner",
+]);
+export const eventTypeEnum = pgEnum("event_type", [
+  "recital",
+  "competition",
+  "workshop",
+  "performance",
+  "other",
+]);
+export const eventStatusEnum = pgEnum("event_status", [
+  "scheduled",
+  "in-progress",
+  "completed",
+  "cancelled",
+]);
 export const documentTypeEnum = pgEnum("document_type", [
   "contract",
   "waiver",
@@ -14,14 +59,18 @@ export const documentTypeEnum = pgEnum("document_type", [
   "form",
   "certificate",
   "other",
-])
-export const enrollmentStatusEnum = pgEnum("enrollment_status", ["active", "dropped", "completed"])
+]);
+export const enrollmentStatusEnum = pgEnum("enrollment_status", [
+  "active",
+  "dropped",
+  "completed",
+]);
 export const enrollmentPaymentStatusEnum = pgEnum("enrollment_payment_status", [
   "pending",
   "paid",
   "partial",
   "overdue",
-])
+]);
 
 export const students = pgTable("students", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -41,7 +90,7 @@ export const students = pgTable("students", {
   medicalConditions: text("medical_conditions"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const staff = pgTable("staff", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -61,7 +110,7 @@ export const staff = pgTable("staff", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const classes = pgTable("classes", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -82,7 +131,7 @@ export const classes = pgTable("classes", {
   endDate: date("end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 // A Session (Batch) is a time-boxed run of a class with fresh choreography / song.
 // e.g. "Hip-Hop – Blinding Lights Batch" (Jun 1 – Jul 15)
@@ -104,7 +153,7 @@ export const classSessions = pgTable("class_sessions", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const enrollments = pgTable("enrollments", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -116,15 +165,19 @@ export const enrollments = pgTable("enrollments", {
     .notNull(),
   // sessionId links enrollment to a specific batch/routine.
   // null = legacy enrollment (no session concept applied yet)
-  sessionId: uuid("session_id").references(() => classSessions.id, { onDelete: "set null" }),
-  paymentId: uuid("payment_id").references(() => payments.id, { onDelete: "set null" }),
+  sessionId: uuid("session_id").references(() => classSessions.id, {
+    onDelete: "set null",
+  }),
+  paymentId: uuid("payment_id").references(() => payments.id, {
+    onDelete: "set null",
+  }),
   enrollmentDate: date("enrollment_date").notNull(),
   status: text("status").default("active").notNull(),
   paymentStatus: text("payment_status").default("pending").notNull(),
   notes: text("notes"), // e.g. "Renewed from previous batch"
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const attendance = pgTable("attendance", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -139,7 +192,7 @@ export const attendance = pgTable("attendance", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -148,7 +201,9 @@ export const payments = pgTable("payments", {
     .references(() => students.id)
     .notNull(),
   classId: uuid("class_id").references(() => classes.id),
-  sessionId: uuid("session_id").references(() => classSessions.id, { onDelete: "set null" }),
+  sessionId: uuid("session_id").references(() => classSessions.id, {
+    onDelete: "set null",
+  }),
   offerId: uuid("offer_id").references(() => offers.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
@@ -159,11 +214,11 @@ export const payments = pgTable("payments", {
   paymentType: text("payment_type"),
   receiptNumber: text("receipt_number"),
   referenceNumber: text("reference_number"),
-  status: text("status").default("completed").notNull(),
+  status: paymentStatusEnum("status").default("completed").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const expenses = pgTable("expenses", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -180,7 +235,7 @@ export const expenses = pgTable("expenses", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const events = pgTable("events", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -196,7 +251,7 @@ export const events = pgTable("events", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const eventParticipants = pgTable("event_participants", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -206,11 +261,13 @@ export const eventParticipants = pgTable("event_participants", {
   studentId: uuid("student_id")
     .references(() => students.id)
     .notNull(),
-  participationStatus: text("participation_status").default("registered").notNull(),
+  participationStatus: text("participation_status")
+    .default("registered")
+    .notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 export const offerTypeEnum = pgEnum("offer_type", [
   "festive",
@@ -220,9 +277,17 @@ export const offerTypeEnum = pgEnum("offer_type", [
   "student",
   "flash",
   "other",
-])
-export const offerStatusEnum = pgEnum("offer_status", ["active", "inactive", "expired", "scheduled"])
-export const discountTypeEnum = pgEnum("discount_type", ["percentage", "fixed"])
+]);
+export const offerStatusEnum = pgEnum("offer_status", [
+  "active",
+  "inactive",
+  "expired",
+  "scheduled",
+]);
+export const discountTypeEnum = pgEnum("discount_type", [
+  "percentage",
+  "fixed",
+]);
 
 export const offers = pgTable("offers", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -230,9 +295,18 @@ export const offers = pgTable("offers", {
   description: text("description"),
   offerType: text("offer_type").notNull(),
   discountType: text("discount_type").notNull().default("percentage"),
-  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
-  minPurchaseAmount: decimal("min_purchase_amount", { precision: 10, scale: 2 }),
-  maxDiscountAmount: decimal("max_discount_amount", { precision: 10, scale: 2 }),
+  discountValue: decimal("discount_value", {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
+  minPurchaseAmount: decimal("min_purchase_amount", {
+    precision: 10,
+    scale: 2,
+  }),
+  maxDiscountAmount: decimal("max_discount_amount", {
+    precision: 10,
+    scale: 2,
+  }),
   couponCode: text("coupon_code"),
   usageLimit: integer("usage_limit"),
   usageCount: integer("usage_count").default(0),
@@ -243,7 +317,7 @@ export const offers = pgTable("offers", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});
 
 // Links an offer of type "bundle" to the classes included in the package.
 export const offerClasses = pgTable("offer_classes", {
@@ -255,7 +329,7 @@ export const offerClasses = pgTable("offer_classes", {
     .references(() => classes.id, { onDelete: "cascade" })
     .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-})
+});
 
 export const documents = pgTable("documents", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -271,4 +345,4 @@ export const documents = pgTable("documents", {
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+});

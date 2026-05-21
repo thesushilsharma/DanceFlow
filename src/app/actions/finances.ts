@@ -28,13 +28,20 @@ import {
 } from "@/lib/payment-status";
 import { calculateVat } from "@/lib/vat";
 
-const ALLOWED_PAYMENT_STATUSES = new Set([
+type PaymentRecordStatus = "pending" | "completed" | "failed" | "refunded";
+
+const ALLOWED_PAYMENT_STATUSES = new Set<PaymentRecordStatus>([
   "completed",
   "pending",
   "refunded",
   "failed",
-  "cancelled",
 ]);
+
+function parsePaymentRecordStatus(status: string): PaymentRecordStatus | null {
+  return ALLOWED_PAYMENT_STATUSES.has(status as PaymentRecordStatus)
+    ? (status as PaymentRecordStatus)
+    : null;
+}
 
 function revalidateFinancePaths() {
   revalidatePath("/dashboard/finances");
@@ -62,6 +69,7 @@ export async function getGroupedPayments(): Promise<PaymentGroup[]> {
         sessionId: payments.sessionId,
         studentFirstName: students.firstName,
         studentLastName: students.lastName,
+        studentEmail: students.email,
         className: classes.name,
         sessionName: classSessions.name,
         offerTitle: offers.title,
@@ -222,7 +230,7 @@ async function insertPaymentRows(
     paymentType?: string;
     receiptNumber?: string;
     referenceNumber?: string;
-    status: string;
+    status: PaymentRecordStatus;
     notes?: string;
   }>,
 ) {
@@ -254,10 +262,11 @@ export async function createPayment(
       (formData.get("receiptNumber") as string | null)?.trim() || null;
     const referenceNumber = formData.get("referenceNumber") as string | null;
     const status = (formData.get("status") as string) || "completed";
+    const paymentStatus = parsePaymentRecordStatus(status);
     const notes = formData.get("notes") as string | null;
 
     if (!studentId) return { success: false, error: "Please select a student" };
-    if (!ALLOWED_PAYMENT_STATUSES.has(status)) {
+    if (!paymentStatus) {
       return { success: false, error: "Invalid payment status" };
     }
     if (!amount || !paymentDate) {
@@ -305,7 +314,7 @@ export async function createPayment(
     }
 
     const paymentGroupId = crypto.randomUUID();
-    const markEnrollmentPaid = status === "completed" || status === "paid";
+    const markEnrollmentPaid = paymentStatus === "completed";
 
     await db.transaction(async (tx) => {
       const client = tx as unknown as typeof db;
@@ -317,7 +326,7 @@ export async function createPayment(
         paymentType: paymentType || undefined,
         receiptNumber: receiptNumber || undefined,
         referenceNumber: referenceNumber || undefined,
-        status,
+        status: paymentStatus,
         notes: notes || undefined,
       };
 
@@ -503,16 +512,17 @@ export async function updatePaymentGroup(
     const receiptNumber = formData.get("receiptNumber") as string | null;
     const referenceNumber = formData.get("referenceNumber") as string | null;
     const status = formData.get("status") as string;
+    const paymentStatus = parsePaymentRecordStatus(status);
     const notes = formData.get("notes") as string | null;
 
-    if (!ALLOWED_PAYMENT_STATUSES.has(status)) {
+    if (!paymentStatus) {
       return { success: false, error: "Invalid payment status" };
     }
 
     const group = await getPaymentGroupByKey(groupKey);
     if (!group) return { success: false, error: "Payment not found" };
 
-    const markEnrollmentPaid = status === "completed" || status === "paid";
+    const markEnrollmentPaid = paymentStatus === "completed";
 
     await db.transaction(async (tx) => {
       const client = tx as unknown as typeof db;
@@ -524,7 +534,7 @@ export async function updatePaymentGroup(
           paymentType: paymentType || undefined,
           receiptNumber: receiptNumber || undefined,
           referenceNumber: referenceNumber || undefined,
-          status,
+          status: paymentStatus,
           notes: notes || undefined,
           updatedAt: new Date(),
         })
