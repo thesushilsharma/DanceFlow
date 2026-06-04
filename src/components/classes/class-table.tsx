@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useMemo, useState } from "react";
+import { useTransition, useMemo, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,7 +59,7 @@ export function ClassTable({
   const [sessionsDialogOpen, setSessionsDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassWithDetails | null>(null);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     if (!confirm("Are you sure you want to delete this class?")) return;
 
     startTransition(async () => {
@@ -70,22 +70,22 @@ export function ClassTable({
         toast.error(result.error);
       }
     });
-  };
+  }, []);
 
-  const handleEdit = (classItem: ClassWithDetails) => {
+  const handleEdit = useCallback((classItem: ClassWithDetails) => {
     setSelectedClass(classItem);
     setEditDialogOpen(true);
-  };
+  }, []);
 
-  const handleManageEnrollments = (classItem: ClassWithDetails) => {
+  const handleManageEnrollments = useCallback((classItem: ClassWithDetails) => {
     setSelectedClass(classItem);
     setEnrollmentsDialogOpen(true);
-  };
+  }, []);
 
-  const handleSessions = (classItem: ClassWithDetails) => {
+  const handleSessions = useCallback((classItem: ClassWithDetails) => {
     setSelectedClass(classItem);
     setSessionsDialogOpen(true);
-  };
+  }, []);
 
   const columns = useMemo<ColumnDef<ClassWithDetails>[]>(
     () => [
@@ -208,7 +208,7 @@ export function ClassTable({
         },
       },
     ],
-    [isPending, handleDelete, handleEdit, handleManageEnrollments]
+    [isPending, handleDelete, handleEdit, handleManageEnrollments, handleSessions]
   );
 
   return (
