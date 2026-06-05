@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useTransition, useMemo } from "react"
+import { useState, useEffect, useTransition, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,7 +23,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select"
 import {
   Popover,
@@ -123,13 +122,7 @@ export function ManageEnrollmentsDialog({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState("")
 
-  useEffect(() => {
-    if (open) {
-      loadData()
-    }
-  }, [open, classId])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
       const [enrollmentsData, studentsData] = await Promise.all([
@@ -148,9 +141,15 @@ export function ManageEnrollmentsDialog({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [classId])
 
-  const handleAddEnrollment = () => {
+  useEffect(() => {
+    if (open) {
+      loadData()
+    }
+  }, [open, loadData])
+
+  const handleAddEnrollment = useCallback(() => {
     if (selectedStudents.length === 0) {
       toast.error("Please select at least one student")
       return
@@ -166,9 +165,9 @@ export function ManageEnrollmentsDialog({
         toast.error(result.error)
       }
     })
-  }
+  }, [selectedStudents, classId, loadData, router])
 
-  const handleRemoveEnrollment = (enrollmentId: string, studentName: string) => {
+  const handleRemoveEnrollment = useCallback((enrollmentId: string, studentName: string) => {
     if (!confirm(`Are you sure you want to remove ${studentName} from this class?`)) return
     startTransition(async () => {
       const result = await removeEnrollment(enrollmentId)
@@ -180,9 +179,9 @@ export function ManageEnrollmentsDialog({
         toast.error(result.error)
       }
     })
-  }
+  }, [loadData, router])
 
-  const handleStatusChange = (enrollmentId: string, newStatus: string, currentPaymentStatus: string) => {
+  const handleStatusChange = useCallback((enrollmentId: string, newStatus: string, currentPaymentStatus: string) => {
     startTransition(async () => {
       const result = await updateEnrollmentStatus(enrollmentId, newStatus, currentPaymentStatus)
       if (result.success) {
@@ -193,9 +192,9 @@ export function ManageEnrollmentsDialog({
         toast.error(result.error)
       }
     })
-  }
+  }, [loadData, router])
 
-  const handlePaymentStatusChange = (enrollmentId: string, currentStatus: string, newPaymentStatus: string) => {
+  const handlePaymentStatusChange = useCallback((enrollmentId: string, currentStatus: string, newPaymentStatus: string) => {
     startTransition(async () => {
       const result = await updateEnrollmentStatus(enrollmentId, currentStatus, newPaymentStatus)
       if (result.success) {
@@ -206,7 +205,7 @@ export function ManageEnrollmentsDialog({
         toast.error(result.error)
       }
     })
-  }
+  }, [loadData, router])
 
   const filteredStudents = students.filter(
     (student) =>
@@ -352,7 +351,7 @@ export function ManageEnrollmentsDialog({
         ),
       },
     ],
-    [isPending]
+    [isPending, handleStatusChange, handlePaymentStatusChange, handleRemoveEnrollment]
   )
 
   const table = useReactTable({

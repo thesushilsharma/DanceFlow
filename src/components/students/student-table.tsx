@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useTransition, useState } from "react"
+import { useMemo, useTransition, useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,7 +16,7 @@ import { deleteStudent } from "@/app/actions/students"
 import { toast } from "sonner"
 import { formatDate } from "@/lib/date"
 import { DataTable } from "@/components/ui/data-table"
-import { ColumnDef } from "@tanstack/react-table"
+import type { ColumnDef } from "@tanstack/react-table"
 import { ViewStudentDialog } from "@/components/students/view-student-dialog"
 import { EditStudentDialog } from "@/components/students/edit-student-dialog"
 
@@ -55,7 +55,7 @@ export function StudentTable({ students }: { students: Student[] }) {
   const [viewStudent, setViewStudent] = useState<Student | null>(null)
   const [editStudent, setEditStudent] = useState<Student | null>(null)
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     if (!confirm("Are you sure you want to delete this student?")) return
 
     startTransition(async () => {
@@ -66,7 +66,7 @@ export function StudentTable({ students }: { students: Student[] }) {
         toast.error(result.error)
       }
     })
-  }
+  }, [])
 
   const columns = useMemo<ColumnDef<Student>[]>(
     () => [
@@ -154,7 +154,7 @@ export function StudentTable({ students }: { students: Student[] }) {
         },
       },
     ],
-    [isPending]
+    [isPending, handleDelete]
   )
 
   return (

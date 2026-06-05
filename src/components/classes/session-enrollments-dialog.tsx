@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useTransition, useMemo } from "react"
+import { useState, useEffect, useTransition, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select"
 import {
   Popover, PopoverContent, PopoverTrigger,
@@ -106,7 +106,7 @@ export function SessionEnrollmentsDialog({
 
   const maxCap = session.maxCapacity ?? classCapacity
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
       const [enrolData, studentsData] = await Promise.all([
@@ -123,13 +123,13 @@ export function SessionEnrollmentsDialog({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [session.id])
 
   useEffect(() => {
     if (open) loadData()
-  }, [open, session.id])
+  }, [open, loadData])
 
-  const handleEnroll = () => {
+  const handleEnroll = useCallback(() => {
     if (!selectedStudents.length) return toast.error("Select at least one student")
     startTransition(async () => {
       const r = await addSessionEnrollment(session.id, classId, selectedStudents)
@@ -143,9 +143,9 @@ export function SessionEnrollmentsDialog({
         toast.error(r.error)
       }
     })
-  }
+  }, [selectedStudents, session.id, classId, loadData, onEnrolled, router])
 
-  const handleRemove = (enrollmentId: string, name: string) => {
+  const handleRemove = useCallback((enrollmentId: string, name: string) => {
     if (!confirm(`Remove ${name} from this session?`)) return
     startTransition(async () => {
       const r = await removeEnrollment(enrollmentId)
@@ -158,15 +158,15 @@ export function SessionEnrollmentsDialog({
         toast.error(r.error)
       }
     })
-  }
+  }, [loadData, onEnrolled, router])
 
-  const handleStatusChange = (id: string, status: string, paymentStatus: string) => {
+  const handleStatusChange = useCallback((id: string, status: string, paymentStatus: string) => {
     startTransition(async () => {
       const r = await updateEnrollmentStatus(id, status, paymentStatus)
       if (r.success) { toast.success("Updated"); await loadData() }
       else toast.error(r.error)
     })
-  }
+  }, [loadData])
 
   const columns = useMemo<ColumnDef<Enrollment>[]>(
     () => [
@@ -253,7 +253,7 @@ export function SessionEnrollmentsDialog({
         ),
       },
     ],
-    [isPending]
+    [isPending, handleStatusChange, handleRemove]
   )
 
   const table = useReactTable({

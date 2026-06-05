@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useActionState, useTransition } from "react"
+import { useState, useEffect, useActionState, useTransition, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -74,7 +74,7 @@ function SessionForm({
 }) {
   const isEdit = !!session
   const boundAction = isEdit
-    ? updateSession.bind(null, session!.id)
+    ? updateSession.bind(null, session.id)
     : createSession.bind(null, classId)
 
   const [state, action, isPending] = useActionState(boundAction, null)
@@ -86,7 +86,7 @@ function SessionForm({
     } else if (state?.error) {
       toast.error(state.error)
     }
-  }, [state])
+  }, [state, isEdit, onSuccess])
 
   const defaultValues = session
     ? {
@@ -215,17 +215,17 @@ export function SessionsDialog({
   // Enrollments sub-dialog
   const [enrollSession, setEnrollSession] = useState<ClassSession | null>(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setIsLoading(true)
     setSessions(await getClassSessions(classId))
     setIsLoading(false)
-  }
+  }, [classId])
 
   useEffect(() => {
     if (open) load()
-  }, [open, classId])
+  }, [open, load])
 
-  const handleDelete = (session: ClassSession) => {
+  const handleDelete = useCallback((session: ClassSession) => {
     if (session.enrollmentCount > 0) {
       toast.error(`Cannot delete — ${session.enrollmentCount} student(s) enrolled`)
       return
@@ -236,9 +236,9 @@ export function SessionsDialog({
       r.success ? toast.success("Session deleted") : toast.error(r.error)
       load()
     })
-  }
+  }, [load])
 
-  const handleRenew = (session: ClassSession) => {
+  const handleRenew = useCallback((session: ClassSession) => {
     const pivot = session.endDate ?? session.startDate
     const others = sessions.filter(
       (s) => s.id !== session.id && (s.status === "upcoming" || s.status === "active")
@@ -264,13 +264,13 @@ export function SessionsDialog({
     startTransition(async () => {
       const r = await renewSessionEnrollments(session.id, target.id, classId)
       if (r.success) {
-        toast.success(`${(r as any).count} student(s) renewed into "${target.name}"`)
+        toast.success(`${(r as { count: number }).count} student(s) renewed into "${target.name}"`)
         load()
       } else {
         toast.error(r.error)
       }
     })
-  }
+  }, [sessions, classId, load])
 
   return (
     <>

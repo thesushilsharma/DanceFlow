@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useTransition, useMemo } from "react"
+import { useState, useEffect, useTransition, useMemo, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -11,7 +11,7 @@ import { CalendarIcon, ArrowUpDown } from "lucide-react"
 import { format } from "date-fns"
 import { getAttendanceForClass, updateAttendance, type AttendanceStatus } from "@/app/actions/attendance"
 import { DataTable } from "@/components/ui/data-table"
-import { ColumnDef } from "@tanstack/react-table"
+import type { ColumnDef } from "@tanstack/react-table"
 
 const statusOptions: { value: AttendanceStatus; label: string; color: string }[] = [
   { value: "present", label: "Present", color: "bg-green-500/10 text-green-700 dark:text-green-400" },
@@ -26,6 +26,19 @@ export function AttendanceTracker({ classes }: { classes: any[] }) {
   const [attendanceData, setAttendanceData] = useState<any[]>([])
   const [isPending, startTransition] = useTransition()
 
+  // Use refs to keep latest values without causing re-renders
+  const dateRef = useRef(date)
+  const selectedClassRef = useRef(selectedClass)
+
+  // Update refs when values change
+  useEffect(() => {
+    dateRef.current = date
+  }, [date])
+
+  useEffect(() => {
+    selectedClassRef.current = selectedClass
+  }, [selectedClass])
+
   useEffect(() => {
     if (selectedClass) {
       startTransition(async () => {
@@ -38,16 +51,16 @@ export function AttendanceTracker({ classes }: { classes: any[] }) {
     }
   }, [selectedClass, date])
 
-  const handleStatusChange = (studentId: number, newStatus: AttendanceStatus, attendanceId?: number) => {
+  const handleStatusChange = useCallback((studentId: number, newStatus: AttendanceStatus, attendanceId?: number) => {
     startTransition(async () => {
-      const formattedDate = format(date, "yyyy-MM-dd")
-      await updateAttendance(selectedClass, studentId.toString(), formattedDate, newStatus, attendanceId?.toString())
+      const formattedDate = format(dateRef.current, "yyyy-MM-dd")
+      await updateAttendance(selectedClassRef.current, studentId.toString(), formattedDate, newStatus, attendanceId?.toString())
 
       setAttendanceData((prevData) => 
         prevData.map((s) => (s.id === studentId ? { ...s, status: newStatus } : s))
       )
     })
-  }
+  }, [])
 
   const columns = useMemo<ColumnDef<any>[]>(
     () => [
@@ -105,7 +118,7 @@ export function AttendanceTracker({ classes }: { classes: any[] }) {
         },
       },
     ],
-    [isPending, handleStatusChange] 
+    [isPending] 
   )
 
   return (
